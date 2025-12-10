@@ -3,16 +3,11 @@ import Head from 'next/head';
 import { useState, useEffect, useCallback } from 'react';
 import { SPREAD_CONFIG, DISPLAY_PAIRS, CURRENCY_SYMBOLS, CURRENCIES } from '../config';
 
-// 固定的 USDT 圖標 (使用 Unicode 符號)
-const USDT_ICON = '🟡'; // 可以替換為任何其他表情符號或圖片連結
+// 固定的 USDT 圖標 URL (請將此 URL 替換為您上傳到 Vercel/GitHub 的圖片公開連結)
+const USDT_IMG_URL = '/tether-usdt-logo.png'; // 假設您將圖片 'tether-usdt-logo.png' 放在 public 資料夾下
 
-// --- 匯率計算核心邏輯 ---
+// --- 匯率計算核心邏輯 (保持不變) ---
 
-/**
- * 核心計算函數：計算所有交叉幣種的買入價和賣出價 
- * @param {object} baseRates - 從 API 獲取的即時中價數據 (以 USD 為基準)
- * @param {object} spreadConfig - 價差配置
- */
 const calculateRates = (baseRates, spreadConfig) => {
     const finalRates = {};
 
@@ -24,7 +19,6 @@ const calculateRates = (baseRates, spreadConfig) => {
         if (from === 'USD') {
             midRate = baseRates[to];
         } else {
-            // 這個專案只有 USD 為基準，所以這裡的 else 主要是防止錯誤
             midRate = baseRates[to] / baseRates[from];
         }
         
@@ -33,7 +27,6 @@ const calculateRates = (baseRates, spreadConfig) => {
              return; 
         }
 
-        // 計算 Buy/Sell Rate
         const buyRate = midRate * (1 + spreadDelta); 
         const sellRate = midRate * (1 - spreadDelta); 
 
@@ -49,7 +42,7 @@ const calculateRates = (baseRates, spreadConfig) => {
 
 // --- 輔助函數：將 USD 替換為 USDT 顯示 ---
 const formatCurrencyDisplay = (code) => {
-    return code === 'USD' ? `USDT ${USDT_ICON}` : code;
+    return code === 'USD' ? 'USDT' : code;
 };
 
 // --- 前端元件與介面 ---
@@ -63,12 +56,12 @@ const Home = () => {
 
     // 計算機狀態
     const [amount, setAmount] = useState(100);
-    const [fromCurrency, setFromCurrency] = useState('USD'); // 預設為 USD/USDT
-    const [toCurrency, setToCurrency] = useState('KRW');
+    const [fromCurrency, setFromCurrency] = useState('USD');
+    const [toCurrency, setToCurrency] = useState('KRW'); // 預設 KRW 
     const [result, setResult] = useState(null);
     const [type, setType] = useState('buy'); 
 
-    // --- 數據獲取函數 (API 代理) ---
+    // --- 數據獲取函數 (保持不變) ---
     const fetchRates = useCallback(async () => {
         setLoading(true);
         setError(null);
@@ -86,7 +79,6 @@ const Home = () => {
             setTimestamp(apiData.timestamp);
             
         } catch (err) {
-            // 由於 API 可能拒絕，我們顯示一個更清晰的錯誤提示
             setError('數據獲取失敗，請檢查 API Key 或等待額度重置。');
         } finally {
             setLoading(false);
@@ -102,7 +94,7 @@ const Home = () => {
     }, [fetchRates]);
 
 
-    // --- 計算機邏輯 ---
+    // --- 計算機邏輯 (保持不變) ---
     const handleConvert = () => {
         if (!rates) {
             setResult({ message: '匯率數據尚未載入。' });
@@ -113,7 +105,7 @@ const Home = () => {
         const rateObject = rates[rateKey];
 
         if (!rateObject) {
-             setResult({ message: '該交易對不在顯示列表中，請選擇 USD 兌換其他貨幣。' });
+             setResult({ message: '請選擇顯示列表中的四個主要交易對進行試算。' });
              return;
         }
 
@@ -149,16 +141,15 @@ const Home = () => {
                         
                         if (!rate) return null;
                         
-                        // 替換顯示名稱
                         const displayFrom = formatCurrencyDisplay(from);
-                        const displayTo = formatCurrencyDisplay(to);
-
-                        const displayRate = `1 ${displayFrom} = ${CURRENCY_SYMBOLS[to] || to}`;
-
+                        
                         return (
                             <tr key={rateKey} style={{ borderBottom: '1px solid #eee' }}>
-                                <td style={{ padding: '10px', border: '1px solid #ddd', fontWeight: 'bold' }}>
-                                    {USDT_ICON} {displayFrom.replace(` ${USDT_ICON}`, '')}/{to} <span style={{fontSize:'0.8em', fontWeight: 'normal'}} >({displayRate})</span>
+                                <td style={{ padding: '10px', border: '1px solid #ddd', fontWeight: 'bold', display: 'flex', alignItems: 'center' }}>
+                                    {/* 替換為圖片圖標 */}
+                                    <img src={USDT_IMG_URL} alt="USDT Icon" style={{width: '20px', height: '20px', marginRight: '8px'}} />
+                                    {displayFrom}/{to} {icon} 
+                                    {/* 移除後面的匯率基礎提示 (1 USDT = ₩) */}
                                 </td>
                                 <td style={{ padding: '10px', border: '1px solid #ddd', color: '#28a745' }}>
                                     {rate.buy.toFixed(4)}
@@ -193,9 +184,8 @@ const Home = () => {
             {/* --- 板塊一: 實時匯率顯示 --- */}
             <section style={{ marginBottom: '50px', backgroundColor: 'white', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 8px rgba(0,0,0,0.05)' }}>
                 <h2>📈 實時匯率</h2>
-                <blockquote style={{ borderLeft: '3px solid #d9534f', paddingLeft: '15px', margin: '15px 0', backgroundColor: '#f9e8e7', fontSize: '0.9em' }}>
-                    **自訂價差：** USD/KRW: 5% | USD/PHP: 5% | USD/JPY: 5% | USD/HKD: 5%
-                </blockquote>
+                {/* 移除自訂價差說明 (要求 5) */}
+                
                 {renderRateTable()}
             </section>
 
@@ -239,7 +229,7 @@ const Home = () => {
                             onChange={() => setType('buy')} 
                             style={{ marginRight: '5px' }}
                         />
-                        客戶**買入** {formatCurrencyDisplay(toCurrency)} (使用買入價)
+                        客戶**買入** {formatCurrencyDisplay(toCurrency)} 
                     </label>
                     <label>
                         <input 
@@ -249,7 +239,7 @@ const Home = () => {
                             onChange={() => setType('sell')} 
                             style={{ marginRight: '5px' }}
                         />
-                        客戶**賣出** {formatCurrencyDisplay(toCurrency)} (使用賣出價)
+                        客戶**賣出** {formatCurrencyDisplay(toCurrency)} 
                     </label>
                 </div>
 
@@ -269,9 +259,7 @@ const Home = () => {
                                 <p style={{ fontSize: '1.8em', color: '#0070f3', margin: '0' }}>
                                     約等於 <span style={{ fontWeight: 'bolder' }}>{result.amount}</span> {formatCurrencyDisplay(toCurrency)}
                                 </p>
-                                <p style={{ fontSize: '0.9em', color: '#666', marginTop: '10px' }}>
-                                    (本次使用的匯率: 1 {formatCurrencyDisplay(fromCurrency)} = {result.rate} {formatCurrencyDisplay(toCurrency)})
-                                </p>
+                                {/* 移除使用的匯率提示 */}
                             </>
                         )}
                     </div>
