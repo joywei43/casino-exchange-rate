@@ -27,5 +27,3 @@ export const CURRENCY_SYMBOLS = {
     JPY: '¥',
     HKD: 'HK$',
 };
-
-// 移除所有 TWD/USD 的手動設定，專注於穩定性。
