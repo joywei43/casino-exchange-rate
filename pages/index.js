@@ -1,25 +1,28 @@
 // pages/index.js
 import Head from 'next/head';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { SPREAD_CONFIG, DISPLAY_PAIRS, CURRENCY_SYMBOLS, CURRENCIES } from '../config';
 
 const USDT_IMG_URL = '/tether-usdt-logo.png'; 
 
-// --- 匯率計算核心邏輯 (簡化) ---
+// --- 匯率計算核心邏輯 (確保包含反向計算) ---
 const calculateRates = (baseRates, spreadConfig) => {
     const finalRates = {};
 
-    // 只計算 DISPLAY_PAIRS 中定義的交易對
-    DISPLAY_PAIRS.forEach(({ from, to }) => {
-        const rateKey = `${from}_${to}`;
+    // 獲取所有需要的交易對 (包含顯示列表和反向交易)
+    const requiredPairs = DISPLAY_PAIRS.map(p => `${p.from}_${p.to}`);
+    const inversePairs = requiredPairs.map(p => {
+        const [from, to] = p.split('_');
+        return `${to}_${from}`;
+    });
+    const allPairs = [...new Set([...requiredPairs, ...inversePairs])];
+
+    allPairs.forEach((rateKey) => {
+        const [from, to] = rateKey.split('_');
         const spreadDelta = spreadConfig[rateKey] || 0.03; 
         
         let midRate;
-        if (from === 'USD') {
-            midRate = baseRates[to] / baseRates[from];
-        } else {
-             midRate = baseRates[to] / baseRates[from];
-        }
+        midRate = baseRates[to] / baseRates[from];
 
         if (midRate === undefined || midRate === 0) {
              console.error(`Missing base rate or invalid mid rate for ${rateKey}`);
@@ -35,22 +38,6 @@ const calculateRates = (baseRates, spreadConfig) => {
             sell: sellRate,
         };
     });
-    // 增加反向計算，確保計算機可以使用
-    DISPLAY_PAIRS.forEach(({ from, to }) => {
-        const rateKey = `${from}_${to}`;
-        const inverseRateKey = `${to}_${from}`;
-        const rate = finalRates[rateKey];
-        
-        if (rate && !finalRates[inverseRateKey]) {
-            // R(A->B) 的 Buy = 1 / R(B->A) 的 Sell
-            finalRates[inverseRateKey] = {
-                mid: 1 / rate.mid,
-                buy: 1 / rate.sell, 
-                sell: 1 / rate.buy,
-            };
-        }
-    });
-
 
     return finalRates;
 };
@@ -108,7 +95,26 @@ const Home = () => {
     }, [fetchRates]);
 
 
-    // --- 計算機邏輯 (使用修正後的邏輯) ---
+    // 🎯 核心防呆邏輯：根據 From Currency 過濾 To Currency 選項
+    const availableToCurrencies = useMemo(() => {
+        if (fromCurrency === 'USD') {
+            // 如果是 USDT，可以選所有幣種 (除了 USDT 自己)
+            return CURRENCIES.filter(c => c !== 'USD');
+        } else {
+            // 如果是其他幣種 (KRW/PHP/JPY/HKD)，只能兌換回 USD
+            return ['USD'];
+        }
+    }, [fromCurrency]);
+
+    // 確保當 From Currency 改變時，To Currency 是一個有效選項
+    useEffect(() => {
+        if (!availableToCurrencies.includes(toCurrency)) {
+            setToCurrency(availableToCurrencies[0] || 'USD');
+        }
+    }, [fromCurrency, availableToCurrencies, toCurrency]);
+
+
+    // --- 計算機邏輯 (啟用雙向和防呆) ---
     const handleConvert = () => {
         if (!rates) {
             setResult({ message: '匯率數據尚未載入。' });
@@ -116,14 +122,35 @@ const Home = () => {
         }
 
         const rateKey = `${fromCurrency}_${toCurrency}`;
-        const rateObject = rates[rateKey];
+        const inverseRateKey = `${toCurrency}_${fromCurrency}`;
 
-        if (!rateObject) {
-            setResult({ message: '不支援該交易對。請選擇 USD/USDT 與 KRW/PHP/JPY/HKD 之間的兌換。' });
+        let rateObject;
+        let finalRate;
+        let keyToUse;
+
+        // 檢查正向和反向交易對 (由於防呆已處理，這裡只需確保數據存在)
+        if (rates[rateKey]) {
+            rateObject = rates[rateKey];
+            keyToUse = rateKey;
+        } 
+        else if (rates[inverseRateKey]) {
+            rateObject = rates[inverseRateKey];
+            keyToUse = inverseRateKey;
+        } else {
+            // 由於防呆邏輯已經過濾選項，這裡理論上不應該被觸發，除非 API 數據缺失
+            setResult({ message: '不支援該交易對。' });
             return;
         }
-        
-        const finalRate = type === 'buy' ? rateObject.buy : rateObject.sell;
+
+        // 確定最終使用的買賣價
+        if (keyToUse === rateKey) {
+             // 正向交易 (USD -> KRW)
+             finalRate = type === 'buy' ? rates[rateKey].buy : rates[rateKey].sell;
+        } 
+        else if (keyToUse === inverseRateKey) {
+             // 反向交易 (KRW -> USD): R(A->B) 的 Buy = 1 / R(B->A) 的 Sell
+             finalRate = type === 'buy' ? 1 / rates[inverseRateKey].sell : 1 / rates[inverseRateKey].buy;
+        }
 
         const convertedAmount = amount * finalRate;
         
@@ -133,8 +160,9 @@ const Home = () => {
             message: null,
         });
     };
-    
-    // --- 渲染表格 (調整圖標邏輯) ---
+
+
+    // --- 渲染表格 (最終美化) ---
     const renderRateTable = () => {
         if (loading) return <p>數據載入中...</p>;
         if (error) return <p style={{ color: 'red' }}>{error}</p>;
@@ -163,6 +191,7 @@ const Home = () => {
                             return (
                                 <tr key={rateKey} style={{ borderBottom: '1px solid #eee' }}>
                                     <td style={{ padding: '10px', border: '1px solid #ddd', fontWeight: 'bold', display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
+                                        {/* USDT 圖標 */}
                                         {showUsdtLogo && <img src={USDT_IMG_URL} alt="USDT Icon" style={{width: '20px', height: '20px', marginRight: '8px'}} />}
                                         {displayFrom}/{to} {icon} 
                                     </td>
@@ -228,7 +257,7 @@ const Home = () => {
                         />
                     </div>
 
-                    {/* 從幣種/到幣種 (堆疊顯示) */}
+                    {/* 從幣種 (使用 CURRENCIES) */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <label style={{ fontWeight: 'bold' }}>從幣種:</label>
                         <select value={fromCurrency} onChange={(e) => setFromCurrency(e.target.value)} style={{ padding: '10px', width: '60%', border: '1px solid #ddd', borderRadius: '4px' }}>
@@ -236,14 +265,16 @@ const Home = () => {
                         </select>
                     </div>
 
+                    {/* 到幣種 (使用過濾後的 availableToCurrencies) */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <label style={{ fontWeight: 'bold' }}>到幣種:</label>
                         <select value={toCurrency} onChange={(e) => setToCurrency(e.target.value)} style={{ padding: '10px', width: '60%', border: '1px solid #ddd', borderRadius: '4px' }}>
-                            {CURRENCIES.map(c => <option key={c} value={c}>{formatCurrencyDisplay(c)}</option>)}
+                            {availableToCurrencies.map(c => <option key={c} value={c}>{formatCurrencyDisplay(c)}</option>)}
                         </select>
                     </div>
                 </div>
 
+                {/* 移除 '客戶買入/客戶賣出' 那一行單選按鈕 (最終介面精簡) */}
                 <div style={{ marginBottom: '25px', display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
                      <label>
                         <input 
