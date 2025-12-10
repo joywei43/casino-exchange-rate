@@ -61,6 +61,7 @@ const Home = () => {
     const [fromCurrency, setFromCurrency] = useState('USD'); 
     const [toCurrency, setToCurrency] = useState('KRW'); 
     const [result, setResult] = useState(null);
+    // 由於用戶要求移除 Buy/Sell 按鈕，我們預設使用 'buy' 價格進行計算
     const [type, setType] = useState('buy'); 
 
     // --- 數據獲取函數 (保持不變) ---
@@ -114,7 +115,7 @@ const Home = () => {
     }, [fromCurrency, availableToCurrencies, toCurrency]);
 
 
-    // --- 計算機邏輯 (啟用雙向和防呆) ---
+    // --- 計算機邏輯 (使用預設的 'buy' 價格) ---
     const handleConvert = () => {
         if (!rates) {
             setResult({ message: '匯率數據尚未載入。' });
@@ -124,17 +125,14 @@ const Home = () => {
         const rateKey = `${fromCurrency}_${toCurrency}`;
         const inverseRateKey = `${toCurrency}_${fromCurrency}`;
 
-        let rateObject;
         let finalRate;
         let keyToUse;
 
         // 檢查正向和反向交易對 (由於防呆已處理，這裡只需確保數據存在)
         if (rates[rateKey]) {
-            rateObject = rates[rateKey];
             keyToUse = rateKey;
         } 
         else if (rates[inverseRateKey]) {
-            rateObject = rates[inverseRateKey];
             keyToUse = inverseRateKey;
         } else {
             // 由於防呆邏輯已經過濾選項，這裡理論上不應該被觸發，除非 API 數據缺失
@@ -143,13 +141,14 @@ const Home = () => {
         }
 
         // 確定最終使用的買賣價
+        // **重要：由於移除了選擇按鈕，我們統一使用 'buy' 價格進行計算**
         if (keyToUse === rateKey) {
              // 正向交易 (USD -> KRW)
-             finalRate = type === 'buy' ? rates[rateKey].buy : rates[rateKey].sell;
+             finalRate = rates[rateKey].buy;
         } 
         else if (keyToUse === inverseRateKey) {
              // 反向交易 (KRW -> USD): R(A->B) 的 Buy = 1 / R(B->A) 的 Sell
-             finalRate = type === 'buy' ? 1 / rates[inverseRateKey].sell : 1 / rates[inverseRateKey].buy;
+             finalRate = 1 / rates[inverseRateKey].sell;
         }
 
         const convertedAmount = amount * finalRate;
@@ -158,16 +157,19 @@ const Home = () => {
             amount: convertedAmount.toFixed(4),
             rate: finalRate.toFixed(4),
             message: null,
+            // 由於移除了選項，我們在這裡明確顯示使用的是 Buy 價格
+            rateType: 'Buy (客戶買入)'
         });
     };
 
 
-    // --- 渲染表格 (最終美化) ---
+    // --- 渲染表格 ---
     const renderRateTable = () => {
         if (loading) return <p>數據載入中...</p>;
         if (error) return <p style={{ color: 'red' }}>{error}</p>;
         if (!rates) return <p>無可用匯率數據。</p>;
         
+        // 修正：移除表格中的國旗，只保留 USDT Logo
         const headers = ['交易對', '買入價 (Buy)', '賣出價 (Sell)'];
         
         return (
@@ -179,7 +181,7 @@ const Home = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        {DISPLAY_PAIRS.map(({ from, to, icon }) => {
+                        {DISPLAY_PAIRS.map(({ from, to }) => { // 移除 icon
                             const rateKey = `${from}_${to}`;
                             const rate = rates[rateKey];
                             
@@ -193,7 +195,7 @@ const Home = () => {
                                     <td style={{ padding: '10px', border: '1px solid #ddd', fontWeight: 'bold', display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
                                         {/* USDT 圖標 */}
                                         {showUsdtLogo && <img src={USDT_IMG_URL} alt="USDT Icon" style={{width: '20px', height: '20px', marginRight: '8px'}} />}
-                                        {displayFrom}/{to} {icon} 
+                                        {displayFrom}/{to} 
                                     </td>
                                     <td style={{ padding: '10px', border: '1px solid #ddd', color: '#28a745' }}>
                                         {rate.buy.toFixed(4)}
@@ -257,46 +259,25 @@ const Home = () => {
                         />
                     </div>
 
-                    {/* 從幣種 (使用 CURRENCIES) */}
+                    {/* 從幣種 (標籤修改為「客戶提供幣種」) */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <label style={{ fontWeight: 'bold' }}>從幣種:</label>
+                        <label style={{ fontWeight: 'bold' }}>客戶提供幣種:</label>
                         <select value={fromCurrency} onChange={(e) => setFromCurrency(e.target.value)} style={{ padding: '10px', width: '60%', border: '1px solid #ddd', borderRadius: '4px' }}>
                             {CURRENCIES.map(c => <option key={c} value={c}>{formatCurrencyDisplay(c)}</option>)}
                         </select>
                     </div>
 
-                    {/* 到幣種 (使用過濾後的 availableToCurrencies) */}
+                    {/* 到幣種 (標籤修改為「客戶收到幣種」) */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <label style={{ fontWeight: 'bold' }}>到幣種:</label>
+                        <label style={{ fontWeight: 'bold' }}>客戶收到幣種:</label>
                         <select value={toCurrency} onChange={(e) => setToCurrency(e.target.value)} style={{ padding: '10px', width: '60%', border: '1px solid #ddd', borderRadius: '4px' }}>
                             {availableToCurrencies.map(c => <option key={c} value={c}>{formatCurrencyDisplay(c)}</option>)}
                         </select>
                     </div>
                 </div>
 
-                {/* 移除 '客戶買入/客戶賣出' 那一行單選按鈕 (最終介面精簡) */}
-                <div style={{ marginBottom: '25px', display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
-                     <label>
-                        <input 
-                            type="radio" 
-                            value="buy" 
-                            checked={type === 'buy'} 
-                            onChange={() => setType('buy')} 
-                            style={{ marginRight: '5px' }}
-                        />
-                        客戶**買入**
-                    </label>
-                    <label>
-                        <input 
-                            type="radio" 
-                            value="sell" 
-                            checked={type === 'sell'} 
-                            onChange={() => setType('sell')} 
-                            style={{ marginRight: '5px' }}
-                        />
-                        客戶**賣出**
-                    </label>
-                </div>
+                {/* 徹底移除「客戶買入/客戶賣出」單選按鈕的部分 */}
+                {/* 由於我們預設使用 Buy 價格，此處不需顯示單選按鈕 */}
 
                 <button onClick={handleConvert} disabled={loading} style={{ width: '100%', padding: '12px 30px', backgroundColor: '#d9534f', color: 'white', border: 'none', borderRadius: '4px', cursor: loading ? 'not-allowed' : 'pointer', fontSize: '1.1em', fontWeight: 'bold' }}>
                     {loading ? '載入中...' : '立即計算'}
@@ -309,7 +290,7 @@ const Home = () => {
                         ) : (
                             <>
                                 <p style={{ fontSize: '1.2em', fontWeight: 'bold', margin: '0 0 5px 0' }}>
-                                    {amount} {formatCurrencyDisplay(fromCurrency)} 兌換結果:
+                                    {amount} {formatCurrencyDisplay(fromCurrency)} 兌換結果 (以 {result.rateType} 價格計算):
                                 </p>
                                 <p style={{ fontSize: '1.6em', color: '#0070f3', margin: '0' }}>
                                     約等於 <span style={{ fontWeight: 'bolder' }}>{result.amount}</span> {formatCurrencyDisplay(toCurrency)}
