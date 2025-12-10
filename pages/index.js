@@ -54,9 +54,9 @@ const Home = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    const [amount, setAmount] = useState(20000000); 
-    const [fromCurrency, setFromCurrency] = useState('KRW'); 
-    const [toCurrency, setToCurrency] = useState('USD'); 
+    const [amount, setAmount] = useState(100); 
+    const [fromCurrency, setFromCurrency] = useState('USD'); 
+    const [toCurrency, setToCurrency] = useState('KRW'); 
     const [result, setResult] = useState(null);
 
     // --- 數據獲取函數 (保持不變) ---
@@ -134,7 +134,7 @@ const Home = () => {
             
             // **關鍵修正**：確保取得 R(USD->KRW) 的 Buy 價進行除法
             finalRate = rates[inverseRateKey].buy; // R(USD->KRW).buy
-            convertedAmount = amount / finalRate; // 這會產生 13203.8206
+            convertedAmount = amount / finalRate; 
             
         } else {
             setResult({ message: '不支援該交易對。請選擇 USD/USDT 與 KRW/PHP/JPY/HKD 之間的兌換。' });
@@ -181,14 +181,14 @@ const Home = () => {
                                         {showUsdtLogo && <img src={USDT_IMG_URL} alt="USDT Icon" style={{width: '20px', height: '20px', marginRight: '8px'}} />}
                                         {displayFrom}/{to} {icon} 
                                     </td>
-                                    {/* Sell 數據 (低價) */}
-                                    <td style={{ padding: '10px', border: '1px solid #ddd', color: '#dc3545' }}>
-                                        {rate.sell.toFixed(4)}
-                                    </td>
-                                    {/* Buy 數據 (高價) */}
-                                    <td style={{ padding: '10px', border: '1px solid #ddd', color: '#28a745' }}>
-                                        {rate.buy.toFixed(4)}
-                                    </td>
+                            {/* Sell 數據 (低價) */}
+                            <td style={{ padding: '10px', border: '1px solid #ddd', color: '#dc3545' }}>
+                                {rate.sell.toFixed(4)}
+                            </td>
+                            {/* Buy 數據 (高價) */}
+                            <td style={{ padding: '10px', border: '1px solid #ddd', color: '#28a745' }}>
+                                {rate.buy.toFixed(4)}
+                            </td>
                                 </tr>
                             );
                         })}
@@ -228,7 +228,7 @@ const Home = () => {
                 {renderRateTable()}
             </section>
 
-            {/* --- 板塊二: 試算計算機 --- 見截圖 */}
+            {/* --- 板塊二: 試算計算機 --- */}
             <section style={{ backgroundColor: 'white', padding: '15px', borderRadius: '10px', boxShadow: '0 4px 8px rgba(0,0,0,0.05)' }}>
                 <h2>🧮 匯率試算計算機</h2>
                 
