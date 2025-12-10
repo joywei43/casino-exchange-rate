@@ -60,7 +60,7 @@ const Home = () => {
     const [fromCurrency, setFromCurrency] = useState('USD'); 
     const [toCurrency, setToCurrency] = useState('KRW'); 
     const [result, setResult] = useState(null);
-    // 預設 'buy'，這樣在計算時會使用 buy 價格 (高價)
+    // 預設 'buy' 價格 (這是為了在計算機中，兌換目標幣時使用 Buy 價)
     const [type, setType] = useState('buy'); 
 
     // --- 數據獲取函數 (保持不變) ---
@@ -115,4 +115,90 @@ const Home = () => {
     // --- 計算機邏輯 (使用預設的 'buy' 價格) ---
     const handleConvert = () => {
         if (!rates) {
-            setResult({ message
+            setResult({ message: '匯率數據尚未載入。' });
+            return;
+        }
+
+        const rateKey = `${fromCurrency}_${toCurrency}`;
+        const inverseRateKey = `${toCurrency}_${fromCurrency}`;
+
+        let finalRate;
+        
+        if (rates[rateKey]) {
+             // 正向交易 (USD -> KRW): 使用 Buy 價格 (高價)
+             finalRate = rates[rateKey].buy; 
+        } 
+        else if (rates[inverseRateKey]) {
+             // 反向交易 (KRW -> USD): R(A->B) 的 Buy = 1 / R(B->A) 的 Sell
+             finalRate = 1 / rates[inverseRateKey].sell;
+        } else {
+            // 防呆觸發
+            setResult({ message: '不支援該交易對。請選擇 USD/USDT 與 KRW/PHP/JPY/HKD 之間的兌換。' });
+            return;
+        }
+
+        const convertedAmount = amount * finalRate;
+        
+        setResult({
+            amount: convertedAmount.toFixed(4),
+            rate: finalRate.toFixed(4),
+            message: null,
+        });
+    };
+
+
+    // --- 渲染表格 (表格欄位對調: Sell | Buy) ---
+    const renderRateTable = () => {
+        if (loading) return <p>數據載入中...</p>;
+        if (error) return <p style={{ color: 'red' }}>{error}</p>;
+        if (!rates) return <p>無可用匯率數據。</p>;
+        
+        const headers = ['交易對', '賣出價 (Sell)', '買入價 (Buy)'];
+        
+        return (
+            <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', minWidth: '320px', borderCollapse: 'collapse', textAlign: 'left', marginTop: '10px' }}>
+                    <thead>
+                        <tr style={{ backgroundColor: '#f2f2f2' }}>
+                            {headers.map(h => <th key={h} style={{ padding: '12px', border: '1px solid #ddd', whiteSpace: 'nowrap' }}>{h}</th>)}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {DISPLAY_PAIRS.map(({ from, to, icon }) => {
+                            const rateKey = `${from}_${to}`;
+                            const rate = rates[rateKey];
+                            
+                            if (!rate) return null;
+                            
+                            const displayFrom = formatCurrencyDisplay(from);
+                            const showUsdtLogo = from === 'USD'; 
+
+                            return (
+                                <tr key={rateKey} style={{ borderBottom: '1px solid #eee' }}>
+                                    <td style={{ padding: '10px', border: '1px solid #ddd', fontWeight: 'bold', display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
+                                        {showUsdtLogo && <img src={USDT_IMG_URL} alt="USDT Icon" style={{width: '20px', height: '20px', marginRight: '8px'}} />}
+                                        {displayFrom}/{to} {icon} 
+                                    </td>
+                                    {/* **修正**：對調 Buy 和 Sell 數據位置 */}
+                                    <td style={{ padding: '10px', border: '1px solid #ddd', color: '#dc3545' }}>
+                                        {rate.sell.toFixed(4)}
+                                    </td>
+                                    <td style={{ padding: '10px', border: '1px solid #ddd', color: '#28a745' }}>
+                                        {rate.buy.toFixed(4)}
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+        );
+    };
+
+
+    return (
+        <div style={{ 
+            maxWidth: '1000px', 
+            margin: '0 auto', 
+            padding: '15px', 
+            fontFamily: 'Arial, sans
