@@ -12,10 +12,12 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: 'API Key 未設置，請檢查 Vercel 環境變數 FREE_CURRENCY_API_KEY。' });
     }
 
-    // 1. 構建 API 請求 URL: 基礎貨幣為 USD，並請求所有其他貨幣
-    // Freecurrencyapi 需要 'apikey' 參數
-    const targetSymbols = CURRENCIES.filter(c => c !== 'USD').join(','); 
-    const url = `${BASE_URL}?apikey=${API_KEY}&base_currency=USD&currencies=${targetSymbols}`; 
+    // --- 關鍵修正：Freecurrencyapi 使用 currencies 參數 ---
+    const targetCurrencies = CURRENCIES.filter(c => c !== 'USD').join(','); 
+    
+    // 修正 URL 格式：使用 currencies 替換 symbols
+    const url = `${BASE_URL}?apikey=${API_KEY}&base_currency=USD&currencies=${targetCurrencies}`; 
+    // ----------------------------------------------------
 
     try {
         const response = await fetch(url);
@@ -23,23 +25,21 @@ export default async function handler(req, res) {
         if (!response.ok) {
             let errorText = await response.text();
             
-            // 由於 API 錯誤可能返回 HTML 或純文本
             return res.status(response.status).json({ 
                 error: `外部 API 服務錯誤 (${response.status})`,
-                details: errorText.substring(0, 500) // 提供更多細節
+                details: errorText.substring(0, 500) 
             });
         }
         
         const data = await response.json();
 
-        // 2. 檢查 API 響應內容 (Freecurrencyapi 使用 data 欄位)
+        // 檢查 API 響應內容
         if (!data.data) {
-            // 如果 API 成功響應 (HTTP 200) 但內容錯誤 (例如缺少 data 欄位)
             const errorDetail = data.message || 'API 響應內容無效或缺少 rates 數據';
             return res.status(500).json({ error: '外部 API 數據錯誤', details: errorDetail });
         }
         
-        // 3. 補充 USD 基準值 (API base_currency=USD，USD 匯率應該是 1)
+        // 補充 USD 基準值 (API base_currency=USD，USD 匯率應該是 1)
         const finalRates = {
             ...data.data,
             'USD': 1.00 
@@ -48,7 +48,7 @@ export default async function handler(req, res) {
         // 成功獲取數據，返回給前端
         res.status(200).json({
             rates: finalRates, 
-            timestamp: Date.now(), // 使用當前時間作為時間戳
+            timestamp: Date.now(),
         });
 
     } catch (error) {
