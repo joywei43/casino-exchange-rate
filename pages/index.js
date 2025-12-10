@@ -3,8 +3,8 @@ import Head from 'next/head';
 import { useState, useEffect, useCallback } from 'react';
 import { SPREAD_CONFIG, DISPLAY_PAIRS, CURRENCY_SYMBOLS, CURRENCIES } from '../config';
 
-// 固定的 USDT 圖標 URL (請將此 URL 替換為您上傳到 Vercel/GitHub 的圖片公開連結)
-const USDT_IMG_URL = '/tether-usdt-logo.png'; // 假設您將圖片 'tether-usdt-logo.png' 放在 public 資料夾下
+// 固定的 USDT 圖標 URL 
+const USDT_IMG_URL = '/tether-usdt-logo.png'; 
 
 // --- 匯率計算核心邏輯 (保持不變) ---
 
@@ -57,7 +57,7 @@ const Home = () => {
     // 計算機狀態
     const [amount, setAmount] = useState(100);
     const [fromCurrency, setFromCurrency] = useState('USD');
-    const [toCurrency, setToCurrency] = useState('KRW'); // 預設 KRW 
+    const [toCurrency, setToCurrency] = useState('KRW'); 
     const [result, setResult] = useState(null);
     const [type, setType] = useState('buy'); 
 
@@ -125,54 +125,65 @@ const Home = () => {
         if (error) return <p style={{ color: 'red' }}>{error}</p>;
         if (!rates) return <p>無可用匯率數據。</p>;
         
+        // RWD: 在小螢幕上隱藏 '買入價 (Buy)'/'賣出價 (Sell)'
         const headers = ['交易對', '買入價 (Buy)', '賣出價 (Sell)'];
         
         return (
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', marginTop: '10px' }}>
-                <thead>
-                    <tr style={{ backgroundColor: '#f2f2f2' }}>
-                        {headers.map(h => <th key={h} style={{ padding: '12px', border: '1px solid #ddd' }}>{h}</th>)}
-                    </tr>
-                </thead>
-                <tbody>
-                    {DISPLAY_PAIRS.map(({ from, to, icon }) => {
-                        const rateKey = `${from}_${to}`;
-                        const rate = rates[rateKey];
-                        
-                        if (!rate) return null;
-                        
-                        const displayFrom = formatCurrencyDisplay(from);
-                        
-                        return (
-                            <tr key={rateKey} style={{ borderBottom: '1px solid #eee' }}>
-                                <td style={{ padding: '10px', border: '1px solid #ddd', fontWeight: 'bold', display: 'flex', alignItems: 'center' }}>
-                                    {/* 替換為圖片圖標 */}
-                                    <img src={USDT_IMG_URL} alt="USDT Icon" style={{width: '20px', height: '20px', marginRight: '8px'}} />
-                                    {displayFrom}/{to} {icon} 
-                                    {/* 移除後面的匯率基礎提示 (1 USDT = ₩) */}
-                                </td>
-                                <td style={{ padding: '10px', border: '1px solid #ddd', color: '#28a745' }}>
-                                    {rate.buy.toFixed(4)}
-                                </td>
-                                <td style={{ padding: '10px', border: '1px solid #ddd', color: '#dc3545' }}>
-                                    {rate.sell.toFixed(4)}
-                                </td>
-                            </tr>
-                        );
-                    })}
-                </tbody>
-            </table>
+            <div style={{ overflowX: 'auto' }}> {/* 確保表格在小螢幕上可以滾動 */}
+                <table style={{ width: '100%', minWidth: '320px', borderCollapse: 'collapse', textAlign: 'left', marginTop: '10px' }}>
+                    <thead>
+                        <tr style={{ backgroundColor: '#f2f2f2' }}>
+                            {headers.map(h => <th key={h} style={{ padding: '12px', border: '1px solid #ddd', whiteSpace: 'nowrap' }}>{h}</th>)}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {DISPLAY_PAIRS.map(({ from, to, icon }) => {
+                            const rateKey = `${from}_${to}`;
+                            const rate = rates[rateKey];
+                            
+                            if (!rate) return null;
+                            
+                            const displayFrom = formatCurrencyDisplay(from);
+                            
+                            return (
+                                <tr key={rateKey} style={{ borderBottom: '1px solid #eee' }}>
+                                    <td style={{ padding: '10px', border: '1px solid #ddd', fontWeight: 'bold', display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
+                                        {/* USDT 圖標 */}
+                                        <img src={USDT_IMG_URL} alt="USDT Icon" style={{width: '20px', height: '20px', marginRight: '8px'}} />
+                                        {displayFrom}/{to} {icon} 
+                                    </td>
+                                    <td style={{ padding: '10px', border: '1px solid #ddd', color: '#28a745' }}>
+                                        {rate.buy.toFixed(4)}
+                                    </td>
+                                    <td style={{ padding: '10px', border: '1px solid #ddd', color: '#dc3545' }}>
+                                        {rate.sell.toFixed(4)}
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
         );
     };
 
 
     return (
-        <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '30px', fontFamily: 'Arial, sans-serif', backgroundColor: '#f9f9f9' }}>
+        <div style={{ 
+            maxWidth: '1000px', 
+            margin: '0 auto', 
+            padding: '15px', /* 減少邊距以適應手機 */
+            fontFamily: 'Arial, sans-serif', 
+            backgroundColor: '#f9f9f9',
+            minWidth: '320px'
+        }}>
             <Head>
                 <title>EVERWIN-VIP 參考匯率</title>
+                {/* RWD 關鍵 Meta 標籤 */}
+                <meta name="viewport" content="width=device-width, initial-scale=1.0" />
             </Head>
 
-            <header style={{ textAlign: 'center', marginBottom: '40px', paddingBottom: '20px', borderBottom: '2px solid #ddd' }}>
+            <header style={{ textAlign: 'center', marginBottom: '30px', paddingBottom: '15px', borderBottom: '2px solid #ddd' }}>
                 <h1>🏆 EVERWIN-VIP 參考匯率</h1>
                 {timestamp && (
                     <p style={{ fontSize: '0.85em', color: '#666' }}>
@@ -182,46 +193,49 @@ const Home = () => {
             </header>
             
             {/* --- 板塊一: 實時匯率顯示 --- */}
-            <section style={{ marginBottom: '50px', backgroundColor: 'white', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 8px rgba(0,0,0,0.05)' }}>
+            <section style={{ marginBottom: '30px', backgroundColor: 'white', padding: '15px', borderRadius: '10px', boxShadow: '0 4px 8px rgba(0,0,0,0.05)' }}>
                 <h2>📈 實時匯率</h2>
-                {/* 移除自訂價差說明 (要求 5) */}
+                {/* 移除自訂價差說明 */}
                 
                 {renderRateTable()}
             </section>
 
             {/* --- 板塊二: 試算計算機 --- */}
-            <section style={{ backgroundColor: 'white', padding: '30px', borderRadius: '10px', boxShadow: '0 4px 8px rgba(0,0,0,0.05)' }}>
+            <section style={{ backgroundColor: 'white', padding: '15px', borderRadius: '10px', boxShadow: '0 4px 8px rgba(0,0,0,0.05)' }}>
                 <h2>🧮 匯率試算計算機</h2>
                 
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', alignItems: 'flex-end', marginBottom: '25px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginBottom: '20px' }}>
                     
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>輸入金額:</label>
+                    {/* 輸入金額 */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <label style={{ fontWeight: 'bold' }}>輸入金額:</label>
                         <input 
                             type="number" 
                             value={amount} 
                             onChange={(e) => setAmount(parseFloat(e.target.value) || 0)} 
-                            style={{ padding: '10px', width: '150px', border: '1px solid #ddd', borderRadius: '4px' }}
+                            style={{ padding: '10px', width: '60%', border: '1px solid #ddd', borderRadius: '4px' }}
                         />
                     </div>
 
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>從幣種:</label>
-                        <select value={fromCurrency} onChange={(e) => setFromCurrency(e.target.value)} style={{ padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}>
+                    {/* 從幣種/到幣種 (堆疊顯示) */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <label style={{ fontWeight: 'bold' }}>從幣種:</label>
+                        <select value={fromCurrency} onChange={(e) => setFromCurrency(e.target.value)} style={{ padding: '10px', width: '60%', border: '1px solid #ddd', borderRadius: '4px' }}>
                             {CURRENCIES.map(c => <option key={c} value={c}>{formatCurrencyDisplay(c)}</option>)}
                         </select>
                     </div>
 
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>到幣種:</label>
-                        <select value={toCurrency} onChange={(e) => setToCurrency(e.target.value)} style={{ padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <label style={{ fontWeight: 'bold' }}>到幣種:</label>
+                        <select value={toCurrency} onChange={(e) => setToCurrency(e.target.value)} style={{ padding: '10px', width: '60%', border: '1px solid #ddd', borderRadius: '4px' }}>
                             {CURRENCIES.map(c => <option key={c} value={c}>{formatCurrencyDisplay(c)}</option>)}
                         </select>
                     </div>
                 </div>
 
-                <div style={{ marginBottom: '25px' }}>
-                     <label style={{ marginRight: '30px' }}>
+                <div style={{ marginBottom: '25px', display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
+                     {/* 移除 Buy/Sell 文字提示 (要求 4) */}
+                     <label>
                         <input 
                             type="radio" 
                             value="buy" 
@@ -229,7 +243,7 @@ const Home = () => {
                             onChange={() => setType('buy')} 
                             style={{ marginRight: '5px' }}
                         />
-                        客戶**買入** {formatCurrencyDisplay(toCurrency)} 
+                        客戶**買入**
                     </label>
                     <label>
                         <input 
@@ -239,24 +253,24 @@ const Home = () => {
                             onChange={() => setType('sell')} 
                             style={{ marginRight: '5px' }}
                         />
-                        客戶**賣出** {formatCurrencyDisplay(toCurrency)} 
+                        客戶**賣出**
                     </label>
                 </div>
 
-                <button onClick={handleConvert} disabled={loading} style={{ padding: '12px 30px', backgroundColor: '#d9534f', color: 'white', border: 'none', borderRadius: '4px', cursor: loading ? 'not-allowed' : 'pointer', fontSize: '1.1em', fontWeight: 'bold' }}>
+                <button onClick={handleConvert} disabled={loading} style={{ width: '100%', padding: '12px 30px', backgroundColor: '#d9534f', color: 'white', border: 'none', borderRadius: '4px', cursor: loading ? 'not-allowed' : 'pointer', fontSize: '1.1em', fontWeight: 'bold' }}>
                     {loading ? '載入中...' : '立即計算'}
                 </button>
 
                 {result && (
-                    <div style={{ marginTop: '30px', padding: '20px', backgroundColor: '#f0f8ff', border: '1px solid #bce8f1', borderRadius: '4px' }}>
+                    <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f0f8ff', border: '1px solid #bce8f1', borderRadius: '4px' }}>
                         {result.message ? (
                             <p style={{ color: 'red' }}>{result.message}</p>
                         ) : (
                             <>
-                                <p style={{ fontSize: '1.3em', fontWeight: 'bold', margin: '0 0 10px 0' }}>
+                                <p style={{ fontSize: '1.2em', fontWeight: 'bold', margin: '0 0 5px 0' }}>
                                     {amount} {formatCurrencyDisplay(fromCurrency)} 兌換結果:
                                 </p>
-                                <p style={{ fontSize: '1.8em', color: '#0070f3', margin: '0' }}>
+                                <p style={{ fontSize: '1.6em', color: '#0070f3', margin: '0' }}>
                                     約等於 <span style={{ fontWeight: 'bolder' }}>{result.amount}</span> {formatCurrencyDisplay(toCurrency)}
                                 </p>
                                 {/* 移除使用的匯率提示 */}
