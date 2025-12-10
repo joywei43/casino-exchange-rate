@@ -5,20 +5,18 @@ import { SPREAD_CONFIG, DISPLAY_PAIRS, CURRENCY_SYMBOLS, CURRENCIES } from '../c
 
 const USDT_IMG_URL = '/tether-usdt-logo.png'; 
 
-// --- 匯率計算核心邏輯 (保持不變) ---
+// --- 匯率計算核心邏輯 (簡化) ---
 const calculateRates = (baseRates, spreadConfig) => {
     const finalRates = {};
-    const requiredPairs = DISPLAY_PAIRS.map(p => `${p.from}_${p.to}`);
-    const twdUsdInverse = 'USD_TWD'; 
 
-    [...requiredPairs, twdUsdInverse].forEach((rateKey) => {
-        const [from, to] = rateKey.split('_');
+    // 只計算 DISPLAY_PAIRS 中定義的交易對
+    DISPLAY_PAIRS.forEach(({ from, to }) => {
+        const rateKey = `${from}_${to}`;
         const spreadDelta = spreadConfig[rateKey] || 0.03; 
         
         let midRate;
-        
         if (from === 'USD') {
-            midRate = baseRates[to];
+            midRate = baseRates[to] / baseRates[from];
         } else {
              midRate = baseRates[to] / baseRates[from];
         }
@@ -37,6 +35,22 @@ const calculateRates = (baseRates, spreadConfig) => {
             sell: sellRate,
         };
     });
+    // 增加反向計算，確保計算機可以使用
+    DISPLAY_PAIRS.forEach(({ from, to }) => {
+        const rateKey = `${from}_${to}`;
+        const inverseRateKey = `${to}_${from}`;
+        const rate = finalRates[rateKey];
+        
+        if (rate && !finalRates[inverseRateKey]) {
+            // R(A->B) 的 Buy = 1 / R(B->A) 的 Sell
+            finalRates[inverseRateKey] = {
+                mid: 1 / rate.mid,
+                buy: 1 / rate.sell, 
+                sell: 1 / rate.buy,
+            };
+        }
+    });
+
 
     return finalRates;
 };
@@ -47,6 +61,7 @@ const formatCurrencyDisplay = (code) => {
     return code === 'USD' ? 'USDT' : code;
 };
 
+
 const Home = () => {
     // 狀態設定
     const [rates, setRates] = useState(null);
@@ -56,8 +71,8 @@ const Home = () => {
 
     // 計算機狀態
     const [amount, setAmount] = useState(100);
-    const [fromCurrency, setFromCurrency] = useState('TWD'); 
-    const [toCurrency, setToCurrency] = useState('USD'); 
+    const [fromCurrency, setFromCurrency] = useState('USD'); 
+    const [toCurrency, setToCurrency] = useState('KRW'); 
     const [result, setResult] = useState(null);
     const [type, setType] = useState('buy'); 
 
@@ -93,7 +108,7 @@ const Home = () => {
     }, [fetchRates]);
 
 
-    // --- 計算機邏輯 (保持不變) ---
+    // --- 計算機邏輯 (使用修正後的邏輯) ---
     const handleConvert = () => {
         if (!rates) {
             setResult({ message: '匯率數據尚未載入。' });
@@ -101,35 +116,14 @@ const Home = () => {
         }
 
         const rateKey = `${fromCurrency}_${toCurrency}`;
-        const inverseRateKey = `${toCurrency}_${fromCurrency}`;
+        const rateObject = rates[rateKey];
 
-        let rateObject;
-        let finalRate;
-
-        if (rates[rateKey]) {
-            rateObject = rates[rateKey];
-        } 
-        else if (rates[inverseRateKey]) {
-            rateObject = rates[inverseRateKey];
-            
-            const midRate = 1 / rateObject.mid;
-            const spreadDelta = SPREAD_CONFIG[inverseRateKey] || 0.03; 
-
-            finalRate = type === 'buy' ? midRate * (1 + spreadDelta) : midRate * (1 - spreadDelta);
-            
-        } else {
-            setResult({ message: '僅支援 USD/USDT 與 TWD/KRW/PHP/JPY/HKD 之間的直接兌換。' });
+        if (!rateObject) {
+            setResult({ message: '不支援該交易對。請選擇 USD/USDT 與 KRW/PHP/JPY/HKD 之間的兌換。' });
             return;
         }
-
-        // 檢查 TWD/USD 的特殊買賣價 (因為它是手動設定的)
-        if ((fromCurrency === 'TWD' && toCurrency === 'USD') || (fromCurrency === 'USD' && toCurrency === 'TWD')) {
-             finalRate = type === 'buy' ? rates[rateKey].buy : rates[rateKey].sell;
-        }
-        else if (rates[rateKey]) {
-             finalRate = type === 'buy' ? rates[rateKey].buy : rates[rateKey].sell;
-        }
-
+        
+        const finalRate = type === 'buy' ? rateObject.buy : rateObject.sell;
 
         const convertedAmount = amount * finalRate;
         
@@ -164,14 +158,11 @@ const Home = () => {
                             if (!rate) return null;
                             
                             const displayFrom = formatCurrencyDisplay(from);
-
-                            // 檢查是否顯示 USDT 圖片 (只有 from 是 USD 時顯示)
                             const showUsdtLogo = from === 'USD'; 
 
                             return (
                                 <tr key={rateKey} style={{ borderBottom: '1px solid #eee' }}>
                                     <td style={{ padding: '10px', border: '1px solid #ddd', fontWeight: 'bold', display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
-                                        {/* USDT 圖標 */}
                                         {showUsdtLogo && <img src={USDT_IMG_URL} alt="USDT Icon" style={{width: '20px', height: '20px', marginRight: '8px'}} />}
                                         {displayFrom}/{to} {icon} 
                                     </td>
@@ -188,8 +179,7 @@ const Home = () => {
                 </table>
             </div>
         );
-    );
-};
+    };
 
 
     return (
@@ -254,7 +244,6 @@ const Home = () => {
                     </div>
                 </div>
 
-                {/* 買入/賣出單選按鈕 (保持隱藏，只保留邏輯) */}
                 <div style={{ marginBottom: '25px', display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
                      <label>
                         <input 
