@@ -3,25 +3,26 @@ import Head from 'next/head';
 import { useState, useEffect, useCallback } from 'react';
 import { SPREAD_CONFIG, DISPLAY_PAIRS, CURRENCY_SYMBOLS, CURRENCIES } from '../config';
 
-// 固定的 USDT 圖標 URL 
 const USDT_IMG_URL = '/tether-usdt-logo.png'; 
 
 // --- 匯率計算核心邏輯 (保持不變) ---
-
 const calculateRates = (baseRates, spreadConfig) => {
     const finalRates = {};
+    const requiredPairs = DISPLAY_PAIRS.map(p => `${p.from}_${p.to}`);
+    const twdUsdInverse = 'USD_TWD'; 
 
-    DISPLAY_PAIRS.forEach(({ from, to }) => {
-        const rateKey = `${from}_${to}`;
-        const spreadDelta = spreadConfig[rateKey];
+    [...requiredPairs, twdUsdInverse].forEach((rateKey) => {
+        const [from, to] = rateKey.split('_');
+        const spreadDelta = spreadConfig[rateKey] || 0.03; 
         
         let midRate;
+        
         if (from === 'USD') {
             midRate = baseRates[to];
         } else {
-            midRate = baseRates[to] / baseRates[from];
+             midRate = baseRates[to] / baseRates[from];
         }
-        
+
         if (midRate === undefined || midRate === 0) {
              console.error(`Missing base rate or invalid mid rate for ${rateKey}`);
              return; 
@@ -39,13 +40,12 @@ const calculateRates = (baseRates, spreadConfig) => {
 
     return finalRates;
 };
+// ------------------------------------------------------------------------------------
 
 // --- 輔助函數：將 USD 替換為 USDT 顯示 ---
 const formatCurrencyDisplay = (code) => {
     return code === 'USD' ? 'USDT' : code;
 };
-
-// --- 前端元件與介面 ---
 
 const Home = () => {
     // 狀態設定
@@ -56,8 +56,8 @@ const Home = () => {
 
     // 計算機狀態
     const [amount, setAmount] = useState(100);
-    const [fromCurrency, setFromCurrency] = useState('USD');
-    const [toCurrency, setToCurrency] = useState('KRW'); 
+    const [fromCurrency, setFromCurrency] = useState('TWD'); 
+    const [toCurrency, setToCurrency] = useState('USD'); 
     const [result, setResult] = useState(null);
     const [type, setType] = useState('buy'); 
 
@@ -89,7 +89,6 @@ const Home = () => {
     useEffect(() => {
         fetchRates();
         const intervalId = setInterval(fetchRates, 3600000); 
-
         return () => clearInterval(intervalId);
     }, [fetchRates]);
 
@@ -102,14 +101,36 @@ const Home = () => {
         }
 
         const rateKey = `${fromCurrency}_${toCurrency}`;
-        const rateObject = rates[rateKey];
+        const inverseRateKey = `${toCurrency}_${fromCurrency}`;
 
-        if (!rateObject) {
-             setResult({ message: '請選擇顯示列表中的四個主要交易對進行試算。' });
-             return;
+        let rateObject;
+        let finalRate;
+
+        if (rates[rateKey]) {
+            rateObject = rates[rateKey];
+        } 
+        else if (rates[inverseRateKey]) {
+            rateObject = rates[inverseRateKey];
+            
+            const midRate = 1 / rateObject.mid;
+            const spreadDelta = SPREAD_CONFIG[inverseRateKey] || 0.03; 
+
+            finalRate = type === 'buy' ? midRate * (1 + spreadDelta) : midRate * (1 - spreadDelta);
+            
+        } else {
+            setResult({ message: '僅支援 USD/USDT 與 TWD/KRW/PHP/JPY/HKD 之間的直接兌換。' });
+            return;
         }
 
-        let finalRate = type === 'buy' ? rateObject.buy : rateObject.sell;
+        // 檢查 TWD/USD 的特殊買賣價 (因為它是手動設定的)
+        if ((fromCurrency === 'TWD' && toCurrency === 'USD') || (fromCurrency === 'USD' && toCurrency === 'TWD')) {
+             finalRate = type === 'buy' ? rates[rateKey].buy : rates[rateKey].sell;
+        }
+        else if (rates[rateKey]) {
+             finalRate = type === 'buy' ? rates[rateKey].buy : rates[rateKey].sell;
+        }
+
+
         const convertedAmount = amount * finalRate;
         
         setResult({
@@ -119,17 +140,16 @@ const Home = () => {
         });
     };
     
-    // --- 渲染表格 ---
+    // --- 渲染表格 (調整圖標邏輯) ---
     const renderRateTable = () => {
         if (loading) return <p>數據載入中...</p>;
         if (error) return <p style={{ color: 'red' }}>{error}</p>;
         if (!rates) return <p>無可用匯率數據。</p>;
         
-        // RWD: 在小螢幕上隱藏 '買入價 (Buy)'/'賣出價 (Sell)'
         const headers = ['交易對', '買入價 (Buy)', '賣出價 (Sell)'];
         
         return (
-            <div style={{ overflowX: 'auto' }}> {/* 確保表格在小螢幕上可以滾動 */}
+            <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', minWidth: '320px', borderCollapse: 'collapse', textAlign: 'left', marginTop: '10px' }}>
                     <thead>
                         <tr style={{ backgroundColor: '#f2f2f2' }}>
@@ -144,12 +164,15 @@ const Home = () => {
                             if (!rate) return null;
                             
                             const displayFrom = formatCurrencyDisplay(from);
-                            
+
+                            // 檢查是否顯示 USDT 圖片 (只有 from 是 USD 時顯示)
+                            const showUsdtLogo = from === 'USD'; 
+
                             return (
                                 <tr key={rateKey} style={{ borderBottom: '1px solid #eee' }}>
                                     <td style={{ padding: '10px', border: '1px solid #ddd', fontWeight: 'bold', display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
                                         {/* USDT 圖標 */}
-                                        <img src={USDT_IMG_URL} alt="USDT Icon" style={{width: '20px', height: '20px', marginRight: '8px'}} />
+                                        {showUsdtLogo && <img src={USDT_IMG_URL} alt="USDT Icon" style={{width: '20px', height: '20px', marginRight: '8px'}} />}
                                         {displayFrom}/{to} {icon} 
                                     </td>
                                     <td style={{ padding: '10px', border: '1px solid #ddd', color: '#28a745' }}>
@@ -165,21 +188,21 @@ const Home = () => {
                 </table>
             </div>
         );
-    };
+    );
+};
 
 
     return (
         <div style={{ 
             maxWidth: '1000px', 
             margin: '0 auto', 
-            padding: '15px', /* 減少邊距以適應手機 */
+            padding: '15px', 
             fontFamily: 'Arial, sans-serif', 
             backgroundColor: '#f9f9f9',
             minWidth: '320px'
         }}>
             <Head>
                 <title>EVERWIN-VIP 參考匯率</title>
-                {/* RWD 關鍵 Meta 標籤 */}
                 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
             </Head>
 
@@ -195,8 +218,6 @@ const Home = () => {
             {/* --- 板塊一: 實時匯率顯示 --- */}
             <section style={{ marginBottom: '30px', backgroundColor: 'white', padding: '15px', borderRadius: '10px', boxShadow: '0 4px 8px rgba(0,0,0,0.05)' }}>
                 <h2>📈 實時匯率</h2>
-                {/* 移除自訂價差說明 */}
-                
                 {renderRateTable()}
             </section>
 
@@ -233,8 +254,8 @@ const Home = () => {
                     </div>
                 </div>
 
+                {/* 買入/賣出單選按鈕 (保持隱藏，只保留邏輯) */}
                 <div style={{ marginBottom: '25px', display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
-                     {/* 移除 Buy/Sell 文字提示 (要求 4) */}
                      <label>
                         <input 
                             type="radio" 
@@ -273,7 +294,6 @@ const Home = () => {
                                 <p style={{ fontSize: '1.6em', color: '#0070f3', margin: '0' }}>
                                     約等於 <span style={{ fontWeight: 'bolder' }}>{result.amount}</span> {formatCurrencyDisplay(toCurrency)}
                                 </p>
-                                {/* 移除使用的匯率提示 */}
                             </>
                         )}
                     </div>
