@@ -28,9 +28,7 @@ const calculateRates = (baseRates, spreadConfig) => {
              return; 
         }
 
-        // Buy Rate: 客戶買入目標幣 (高價)
         const buyRate = midRate * (1 + spreadDelta); 
-        // Sell Rate: 客戶賣出目標幣 (低價)
         const sellRate = midRate * (1 - spreadDelta); 
 
         finalRates[rateKey] = {
@@ -108,7 +106,7 @@ const Home = () => {
     }, [fromCurrency, availableToCurrencies, toCurrency]);
 
 
-    // --- 計算機邏輯 (使用您的業務邏輯定案) ---
+    // --- 計算機邏輯 (使用 From/To 決定 Buy/Sell) ---
     const handleConvert = () => {
         if (!rates) {
             setResult({ message: '匯率數據尚未載入。' });
@@ -124,16 +122,17 @@ const Home = () => {
         // 1. 檢查正向和反向交易對
         if (rates[rateKey]) {
             // 情境 1: 正向交易 (USD -> KRW)
-            // 邏輯: 客戶提供 USDT，收到 KRW => 使用 Sell 價 (網站賣出 KRW)
+            // 客戶提供 USDT，收到 KRW => 使用 Sell 價 (網站賣出 KRW)
             finalRate = rates[rateKey].sell;
-            rateTypeDisplay = 'Sell (網站賣出)';
+            rateTypeDisplay = 'Sell (客戶收到)';
         } 
         else if (rates[inverseRateKey]) {
             // 情境 2: 反向交易 (KRW -> USD)
-            // 邏輯: 客戶提供 KRW，收到 USDT => 使用 Buy 價 (網站買入 KRW)
-            // R(A->B) 的 Buy = 1 / R(B->A) 的 Sell (這是 Buy 價，用於客戶買入)
+            // 客戶提供 KRW，收到 USDT => 使用 Buy 價 (網站買入 KRW)
+            // 邏輯: R(A->B) 的 Buy = 1 / R(B->A) 的 Sell
             finalRate = 1 / rates[inverseRateKey].sell;
-            rateTypeDisplay = 'Buy (客戶買入)';
+            rateTypeDisplay = 'Buy (客戶收到)';
+
         } else {
             setResult({ message: '不支援該交易對。請選擇 USD/USDT 與 KRW/PHP/JPY/HKD 之間的兌換。' });
             return;
@@ -162,7 +161,7 @@ const Home = () => {
             <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', minWidth: '320px', borderCollapse: 'collapse', textAlign: 'left', marginTop: '10px' }}>
                     <thead>
-                        <tr style={{ backgroundColor: '#f2f2f2' }>
+                        <tr style={{ backgroundColor: '#f2f2f2' }}>
                             {headers.map(h => <th key={h} style={{ padding: '12px', border: '1px solid #ddd', whiteSpace: 'nowrap' }}>{h}</th>)}
                         </tr>
                     </thead>
@@ -284,9 +283,10 @@ const Home = () => {
                                 <p style={{ fontSize: '1.6em', color: '#0070f3', margin: '0' }}>
                                     約等於 <span style={{ fontWeight: 'bolder' }}>{result.amount}</span> {formatCurrencyDisplay(toCurrency)}
                                 </p>
-                                <p style={{ fontSize: '0.9em', color: '#666', marginTop: '5px' }}>
+                                {/* 移除 '使用價格類型' 那一行 */}
+                                {/* <p style={{ fontSize: '0.9em', color: '#666', marginTop: '5px' }}>
                                     使用價格類型: {result.rateType}
-                                </p>
+                                </p> */}
                             </>
                         )}
                     </div>
