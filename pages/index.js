@@ -5,7 +5,7 @@ import { SPREAD_CONFIG, DISPLAY_PAIRS, CURRENCY_SYMBOLS, CURRENCIES } from '../c
 
 const USDT_IMG_URL = '/tether-usdt-logo.png'; 
 
-// --- 匯率計算核心邏輯 ---
+// --- 匯率計算核心邏輯 (確保包含反向計算) ---
 const calculateRates = (baseRates, spreadConfig) => {
     const finalRates = {};
 
@@ -28,9 +28,7 @@ const calculateRates = (baseRates, spreadConfig) => {
              return; 
         }
 
-        // Buy Rate: 客戶買入目標幣 (高價)
         const buyRate = midRate * (1 + spreadDelta); 
-        // Sell Rate: 客戶賣出目標幣 (低價)
         const sellRate = midRate * (1 - spreadDelta); 
 
         finalRates[rateKey] = {
@@ -60,6 +58,8 @@ const Home = () => {
     const [fromCurrency, setFromCurrency] = useState('USD'); 
     const [toCurrency, setToCurrency] = useState('KRW'); 
     const [result, setResult] = useState(null);
+    // 雖然按鈕被移除，但我們需要一個邏輯來區分 Buy (高價) 和 Sell (低價)
+    // 我們將在 handleConvert 中判斷方向，不需要這個狀態
     const [type, setType] = useState('buy'); 
 
     // --- 數據獲取函數 (保持不變) ---
@@ -109,7 +109,7 @@ const Home = () => {
     }, [fromCurrency, availableToCurrencies, toCurrency]);
 
 
-    // --- 計算機邏輯 (使用預設的 'buy' 價格) ---
+    // --- 計算機邏輯 (使用 From/To 決定 Buy/Sell) ---
     const handleConvert = () => {
         if (!rates) {
             setResult({ message: '匯率數據尚未載入。' });
@@ -120,14 +120,27 @@ const Home = () => {
         const inverseRateKey = `${toCurrency}_${fromCurrency}`;
 
         let finalRate;
+        let rateObject;
+        let rateTypeDisplay;
         
+        // 1. 檢查正向和反向交易對
         if (rates[rateKey]) {
-             finalRate = rates[rateKey].buy; 
+            rateObject = rates[rateKey];
+            
+            // 客戶提供 USD -> 收到 KRW：這是網站賣出 KRW，客戶買入 KRW，適用 Buy 價 (高價)
+            finalRate = rateObject.buy;
+            rateTypeDisplay = 'Buy (客戶買入)';
         } 
         else if (rates[inverseRateKey]) {
-             // 反向交易 (KRW -> USD): R(A->B) 的 Buy = 1 / R(B->A) 的 Sell
-             finalRate = 1 / rates[inverseRateKey].sell;
+            rateObject = rates[inverseRateKey];
+            
+            // 客戶提供 KRW -> 收到 USD：這是網站買入 KRW，客戶賣出 KRW，適用 Sell 價 (低價)
+            // R(A->B) 的 Sell = 1 / R(B->A) 的 Buy
+            finalRate = 1 / rateObject.buy;
+            rateTypeDisplay = 'Sell (客戶賣出)';
+
         } else {
+            // 防呆觸發
             setResult({ message: '不支援該交易對。請選擇 USD/USDT 與 KRW/PHP/JPY/HKD 之間的兌換。' });
             return;
         }
@@ -138,6 +151,7 @@ const Home = () => {
             amount: convertedAmount.toFixed(4),
             rate: finalRate.toFixed(4),
             message: null,
+            rateType: rateTypeDisplay,
         });
     };
 
@@ -148,7 +162,7 @@ const Home = () => {
         if (error) return <p style={{ color: 'red' }}>{error}</p>;
         if (!rates) return <p>無可用匯率數據。</p>;
         
-        const headers = ['交易對', '賣出價 (Sell)', '買入價 (Buy)']; // 欄位對調
+        const headers = ['交易對', '賣出價 (Sell)', '買入價 (Buy)']; 
         
         return (
             <div style={{ overflowX: 'auto' }}>
@@ -174,11 +188,11 @@ const Home = () => {
                                         {showUsdtLogo && <img src={USDT_IMG_URL} alt="USDT Icon" style={{width: '20px', height: '20px', marginRight: '8px'}} />}
                                         {displayFrom}/{to} {icon} 
                                     </td>
-                                    {/* Sell 數據 */}
+                                    {/* Sell 數據 (低價) */}
                                     <td style={{ padding: '10px', border: '1px solid #ddd', color: '#dc3545' }}>
                                         {rate.sell.toFixed(4)}
                                     </td>
-                                    {/* Buy 數據 */}
+                                    {/* Buy 數據 (高價) */}
                                     <td style={{ padding: '10px', border: '1px solid #ddd', color: '#28a745' }}>
                                         {rate.buy.toFixed(4)}
                                     </td>
@@ -257,7 +271,7 @@ const Home = () => {
 
                 {/* 徹底移除單選按鈕的部分 - 這裡是關鍵修正！ */}
                 <div style={{ marginBottom: '25px', height: '0', overflow: 'hidden' }}>
-                     {/* 這裡不渲染任何單選按鈕，但程式碼保留了 type 狀態 */}
+                     {/* 這裡不渲染任何單選按鈕，避免混亂 */}
                 </div>
 
                 <button onClick={handleConvert} disabled={loading} style={{ width: '100%', padding: '12px 30px', backgroundColor: '#d9534f', color: 'white', border: 'none', borderRadius: '4px', cursor: loading ? 'not-allowed' : 'pointer', fontSize: '1.1em', fontWeight: 'bold' }}>
@@ -275,6 +289,9 @@ const Home = () => {
                                 </p>
                                 <p style={{ fontSize: '1.6em', color: '#0070f3', margin: '0' }}>
                                     約等於 <span style={{ fontWeight: 'bolder' }}>{result.amount}</span> {formatCurrencyDisplay(toCurrency)}
+                                </p>
+                                <p style={{ fontSize: '0.9em', color: '#666', marginTop: '5px' }}>
+                                    使用價格類型: {result.rateType}
                                 </p>
                             </>
                         )}
