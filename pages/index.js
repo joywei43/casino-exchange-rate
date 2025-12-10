@@ -5,7 +5,7 @@ import { SPREAD_CONFIG, DISPLAY_PAIRS, CURRENCY_SYMBOLS, CURRENCIES } from '../c
 
 const USDT_IMG_URL = '/tether-usdt-logo.png'; 
 
-// --- 匯率計算核心邏輯 (確保包含反向計算) ---
+// --- 匯率計算核心邏輯 (保持不變) ---
 const calculateRates = (baseRates, spreadConfig) => {
     const finalRates = {};
 
@@ -28,9 +28,7 @@ const calculateRates = (baseRates, spreadConfig) => {
              return; 
         }
 
-        // Buy Rate: 客戶買入目標幣 (高價)
         const buyRate = midRate * (1 + spreadDelta); 
-        // Sell Rate: 客戶賣出目標幣 (低價)
         const sellRate = midRate * (1 - spreadDelta); 
 
         finalRates[rateKey] = {
@@ -60,7 +58,8 @@ const Home = () => {
     const [fromCurrency, setFromCurrency] = useState('USD'); 
     const [toCurrency, setToCurrency] = useState('KRW'); 
     const [result, setResult] = useState(null);
-    const [type, setType] = useState('buy'); // 僅用於邏輯判斷，不影響介面
+    // 移除 type 狀態，完全依賴 from/to 決定報價類型
+    // const [type, setType] = useState('buy'); 
 
     // --- 數據獲取函數 (保持不變) ---
     const fetchRates = useCallback(async () => {
@@ -122,20 +121,22 @@ const Home = () => {
         let finalRate;
         let rateTypeDisplay;
         
-        // 1. 檢查正向和反向交易對
         if (rates[rateKey]) {
-            // 正向交易 (USD -> KRW): 客戶買入 KRW
+            // 情境 1: 正向交易 (USD -> KRW)
+            // 客戶提供 USD，收到 KRW => 客戶買入 KRW => 適用 Buy 價
             finalRate = rates[rateKey].buy;
             rateTypeDisplay = 'Buy (客戶買入)';
+
         } 
         else if (rates[inverseRateKey]) {
-            // 反向交易 (KRW -> USD): 客戶賣出 KRW
-            // R(A->B) 的 Sell = 1 / R(B->A) 的 Buy (這是 Sell 價，用於客戶賣出)
+            // 情境 2: 反向交易 (KRW -> USD)
+            // 客戶提供 KRW，收到 USD => 客戶賣出 KRW => 適用 Sell 價
+            
+            // 邏輯：R(A->B) 的 Sell = 1 / R(B->A) 的 Buy (因為 R(B->A) 的 Buy 是客戶買入 B 時的高價)
             finalRate = 1 / rates[inverseRateKey].buy;
             rateTypeDisplay = 'Sell (客戶賣出)';
 
         } else {
-            // 防呆觸發
             setResult({ message: '不支援該交易對。請選擇 USD/USDT 與 KRW/PHP/JPY/HKD 之間的兌換。' });
             return;
         }
