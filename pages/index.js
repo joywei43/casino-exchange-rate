@@ -54,9 +54,9 @@ const Home = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    const [amount, setAmount] = useState(100);
-    const [fromCurrency, setFromCurrency] = useState('USD'); 
-    const [toCurrency, setToCurrency] = useState('KRW'); 
+    const [amount, setAmount] = useState(20000000); 
+    const [fromCurrency, setFromCurrency] = useState('KRW'); 
+    const [toCurrency, setToCurrency] = useState('USD'); 
     const [result, setResult] = useState(null);
 
     // --- 數據獲取函數 (保持不變) ---
@@ -117,13 +117,12 @@ const Home = () => {
         const inverseRateKey = `${toCurrency}_${fromCurrency}`;
 
         let finalRate;
-        let rateTypeDisplay; // 用於顯示是 Buy 還是 Sell 價格
+        let rateTypeDisplay;
         
         // 1. 檢查正向和反向交易對
         if (rates[rateKey]) {
             // 情境 1: 正向交易 (USD -> KRW)
             // 邏輯: 客戶提供 USDT，收到 KRW => 使用 Sell 價 (網站賣出 KRW)
-            
             // 修正：依照您的邏輯 (鍵入價格 * Sell 匯率)
             finalRate = rates[rateKey].sell;
             rateTypeDisplay = 'Sell (網站賣出)';
@@ -132,8 +131,9 @@ const Home = () => {
             // 情境 2: 反向交易 (KRW -> USD)
             // 邏輯: 客戶提供 KRW，收到 USDT => 使用 Buy 價 (網站買入 KRW)
             
-            // 修正：依照您的邏輯 (鍵入價格 / Buy 匯率)
-            // R(A->B) = 1 / R(B->A) 的 Buy 價
+            // **核心修正**：R(A->B) = 1 / R(B->A) 的 BUY 價
+            // 由於我們想要 KRW / BUY_PRICE，我們需要從 USDT/KRW 交易對中取出 BUY 價
+            // 即：R(KRW->USD) = 1 / R(USD->KRW) 的 Buy 價
             finalRate = 1 / rates[inverseRateKey].buy;
             rateTypeDisplay = 'Buy (客戶買入)';
         } else {
@@ -147,7 +147,7 @@ const Home = () => {
             amount: convertedAmount.toFixed(4),
             rate: finalRate.toFixed(4),
             message: null,
-            rateType: rateTypeDisplay, // 僅用於在結果中顯示，以供確認
+            rateType: rateTypeDisplay,
         });
     };
 
