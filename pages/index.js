@@ -116,8 +116,8 @@ const Home = () => {
         const rateKey = `${fromCurrency}_${toCurrency}`;
         const inverseRateKey = `${toCurrency}_${fromCurrency}`;
 
-        let finalRate;
-        let rateTypeDisplay;
+        let finalRate; // 顯示的 Rate (USD/XXX 基準)
+        let convertedAmount;
         
         // 1. 檢查正向和反向交易對
         if (rates[rateKey]) {
@@ -125,60 +125,26 @@ const Home = () => {
             // 邏輯: 客戶提供 USDT，收到 KRW => 使用 Sell 價 (網站賣出 KRW)
             // 公式: Amount * R(USD->KRW).sell
             finalRate = rates[rateKey].sell;
-            rateTypeDisplay = 'Sell (網站賣出)';
+            convertedAmount = amount * finalRate;
         } 
         else if (rates[inverseRateKey]) {
             // 情境 2: 反向交易 (KRW -> USD)
             // 邏輯: 客戶提供 KRW，收到 USDT => 使用 Buy 價 (網站買入 KRW)
             
-            // **最終修正**：R(KRW->USD) = 1 / R(USD->KRW) 的 BUY 價
+            // **最終修正**：使用 R(USD->KRW) 的 Buy 價進行除法
             // 公式: Amount / R(USD->KRW).buy
+            finalRate = rates[inverseRateKey].buy; // R(USD->KRW).buy
+            convertedAmount = amount / finalRate; 
             
-            // finalRate = Amount / rates[inverseRateKey].buy (錯誤邏輯，Amount 已經在外面)
-            
-            // finalRate 應該是: 1 / R(USD->KRW).buy
-            finalRate = 1 / rates[inverseRateKey].buy;
-            rateTypeDisplay = 'Buy (網站買入)';
         } else {
             setResult({ message: '不支援該交易對。請選擇 USD/USDT 與 KRW/PHP/JPY/HKD 之間的兌換。' });
             return;
         }
-        
-        // 最終計算方式
-        let convertedAmount;
-        
-        if (rates[rateKey]) {
-            // 正向：鍵入價格 * Rate
-            convertedAmount = amount * finalRate;
-        } else if (rates[inverseRateKey]) {
-            // 反向：鍵入價格 / Rate
-            // 因為 finalRate = 1 / R(B->A).buy，所以 Amount * finalRate 其實等於 Amount / R(B->A).buy
-            
-            // 為了簡潔和精確，我們直接使用 Amount / R(B->A).buy
-            convertedAmount = amount / rates[inverseRateKey].buy;
-            
-            // 為了在結果中顯示正確的 rate，我們必須重新計算 finalRate
-            finalRate = rates[inverseRateKey].buy; // 顯示的 rate 應該是 R(USD->KRW) 的 Buy 價
-        }
-        
-        // 重新處理顯示的 Rate 和計算 Rate
-        if (rates[rateKey]) {
-             finalRate = rates[rateKey].sell;
-             convertedAmount = amount * finalRate; // USDT * SELL
-             rateTypeDisplay = 'Sell (網站賣出)';
-        } else if (rates[inverseRateKey]) {
-             // 客戶提供 KRW，收到 USDT => 使用 BUY 價
-             finalRate = rates[inverseRateKey].buy; // R(USD->KRW).buy
-             convertedAmount = amount / finalRate; // KRW / BUY
-             rateTypeDisplay = 'Buy (網站買入)';
-        }
-
 
         setResult({
             amount: convertedAmount.toFixed(4),
             rate: finalRate.toFixed(4),
             message: null,
-            rateType: rateTypeDisplay,
         });
     };
 
@@ -192,11 +158,11 @@ const Home = () => {
         const headers = ['交易對', '賣出價 (Sell)', '買入價 (Buy)']; 
         
         return (
-            <div style={{ overflowX: 'auto" }}>
+            <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', minWidth: '320px', borderCollapse: 'collapse', textAlign: 'left', marginTop: '10px' }}>
                     <thead>
-                        <tr style={{ backgroundColor: '#f2f2f2" }}>
-                            {headers.map(h => <th key={h} style={{ padding: '12px', border: '1px solid #ddd', whiteSpace: 'nowrap" }}>{h}</th>)}
+                        <tr style={{ backgroundColor: '#f2f2f2' }}>
+                            {headers.map(h => <th key={h} style={{ padding: '12px', border: '1px solid #ddd', whiteSpace: 'nowrap' }}>{h}</th>)}
                         </tr>
                     </thead>
                     <tbody>
@@ -210,17 +176,17 @@ const Home = () => {
                             const showUsdtLogo = from === 'USD'; 
 
                             return (
-                                <tr key={rateKey} style={{ borderBottom: '1px solid #eee" }}>
-                                    <td style={{ padding: '10px', border: '1px solid #ddd', fontWeight: 'bold', display: 'flex', alignItems: 'center', whiteSpace: 'nowrap" }}>
+                                <tr key={rateKey} style={{ borderBottom: '1px solid #eee' }}>
+                                    <td style={{ padding: '10px', border: '1px solid #ddd', fontWeight: 'bold', display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
                                         {showUsdtLogo && <img src={USDT_IMG_URL} alt="USDT Icon" style={{width: '20px', height: '20px', marginRight: '8px'}} />}
                                         {displayFrom}/{to} {icon} 
                                     </td>
                                     {/* Sell 數據 (低價) */}
-                                    <td style={{ padding: '10px', border: '1px solid #ddd', color: '#dc3545" }}>
+                                    <td style={{ padding: '10px', border: '1px solid #ddd', color: '#dc3545' }}>
                                         {rate.sell.toFixed(4)}
                                     </td>
                                     {/* Buy 數據 (高價) */}
-                                    <td style={{ padding: '10px', border: '1px solid #ddd', color: '#28a745" }}>
+                                    <td style={{ padding: '10px', border: '1px solid #ddd', color: '#28a745' }}>
                                         {rate.buy.toFixed(4)}
                                     </td>
                                 </tr>
@@ -240,82 +206,82 @@ const Home = () => {
             padding: '15px', 
             fontFamily: 'Arial, sans-serif', 
             backgroundColor: '#f9f9f9',
-            minWidth: '320px"
+            minWidth: '320px'
         }}>
             <Head>
                 <title>EVERWIN-VIP 參考匯率</title>
                 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
             </Head>
 
-            <header style={{ textAlign: 'center', marginBottom: '30px', paddingBottom: '15px', borderBottom: '2px solid #ddd" }}>
+            <header style={{ textAlign: 'center', marginBottom: '30px', paddingBottom: '15px', borderBottom: '2px solid #ddd' }}>
                 <h1>🏆 EVERWIN-VIP 參考匯率</h1>
                 {timestamp && (
-                    <p style={{ fontSize: '0.85em', color: '#666" }}>
-                        最新更新時間: {new Date(timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit" }).replace(/\//g, '.').replace(',', '')}
+                    <p style={{ fontSize: '0.85em', color: '#666' }}>
+                        最新更新時間: {new Date(timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).replace(/\//g, '.').replace(',', '')}
                     </p>
                 )}
             </header>
             
             {/* --- 板塊一: 實時匯率顯示 --- */}
-            <section style={{ marginBottom: '30px', backgroundColor: 'white', padding: '15px', borderRadius: '10px', boxShadow: '0 4px 8px rgba(0,0,0,0.05)" }}>
+            <section style={{ marginBottom: '30px', backgroundColor: 'white', padding: '15px', borderRadius: '10px', boxShadow: '0 4px 8px rgba(0,0,0,0.05)' }}>
                 <h2>📈 實時匯率</h2>
                 {renderRateTable()}
             </section>
 
             {/* --- 板塊二: 試算計算機 --- */}
-            <section style={{ backgroundColor: 'white', padding: '15px', borderRadius: '10px', boxShadow: '0 4px 8px rgba(0,0,0,0.05)" }}>
+            <section style={{ backgroundColor: 'white', padding: '15px', borderRadius: '10px', boxShadow: '0 4px 8px rgba(0,0,0,0.05)' }}>
                 <h2>🧮 匯率試算計算機</h2>
                 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginBottom: '20px" }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginBottom: '20px' }}>
                     
                     {/* 輸入金額 */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center" }}>
-                        <label style={{ fontWeight: 'bold" }}>輸入金額:</label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <label style={{ fontWeight: 'bold' }}>輸入金額:</label>
                         <input 
                             type="number" 
                             value={amount} 
                             onChange={(e) => setAmount(parseFloat(e.target.value) || 0)} 
-                            style={{ padding: '10px', width: '60%', border: '1px solid #ddd', borderRadius: '4px" }}
+                            style={{ padding: '10px', width: '60%', border: '1px solid #ddd', borderRadius: '4px' }}
                         />
                     </div>
 
                     {/* 從幣種 (標籤: 客戶提供幣種) */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center" }}>
-                        <label style={{ fontWeight: 'bold" }}>客戶提供幣種:</label>
-                        <select value={fromCurrency} onChange={(e) => setFromCurrency(e.target.value)} style={{ padding: '10px', width: '60%', border: '1px solid #ddd', borderRadius: '4px" }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <label style={{ fontWeight: 'bold' }}>客戶提供幣種:</label>
+                        <select value={fromCurrency} onChange={(e) => setFromCurrency(e.target.value)} style={{ padding: '10px', width: '60%', border: '1px solid #ddd', borderRadius: '4px' }}>
                             {CURRENCIES.map(c => <option key={c} value={c}>{formatCurrencyDisplay(c)}</option>)}
                         </select>
                     </div>
 
                     {/* 到幣種 (標籤: 客戶收到幣種) */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center" }}>
-                        <label style={{ fontWeight: 'bold" }}>客戶收到幣種:</label>
-                        <select value={toCurrency} onChange={(e) => setToCurrency(e.target.value)} style={{ padding: '10px', width: '60%', border: '1px solid #ddd', borderRadius: '4px" }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <label style={{ fontWeight: 'bold' }}>客戶收到幣種:</label>
+                        <select value={toCurrency} onChange={(e) => setToCurrency(e.target.value)} style={{ padding: '10px', width: '60%', border: '1px solid #ddd', borderRadius: '4px' }}>
                             {availableToCurrencies.map(c => <option key={c} value={c}>{formatCurrencyDisplay(c)}</option>)}
                         </select>
                     </div>
                 </div>
 
                 {/* 徹底移除單選按鈕的部分 */}
-                <div style={{ marginBottom: '25px', height: '0', overflow: 'hidden" }}>
+                <div style={{ marginBottom: '25px', height: '0', overflow: 'hidden' }}>
                      {/* 這裡不渲染任何單選按鈕，避免混亂 */}
                 </div>
 
-                <button onClick={handleConvert} disabled={loading} style={{ width: '100%', padding: '12px 30px', backgroundColor: '#d9534f', color: 'white', border: 'none', borderRadius: '4px', cursor: loading ? 'not-allowed" : 'pointer', fontSize: '1.1em', fontWeight: 'bold" }}>
+                <button onClick={handleConvert} disabled={loading} style={{ width: '100%', padding: '12px 30px', backgroundColor: '#d9534f', color: 'white', border: 'none', borderRadius: '4px', cursor: loading ? 'not-allowed' : 'pointer', fontSize: '1.1em', fontWeight: 'bold' }}>
                     {loading ? '載入中...' : '立即計算'}
                 </button>
 
                 {result && (
-                    <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f0f8ff', border: '1px solid #bce8f1', borderRadius: '4px" }}>
+                    <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f0f8ff', border: '1px solid #bce8f1', borderRadius: '4px' }}>
                         {result.message ? (
-                            <p style={{ color: 'red" }}>{result.message}</p>
+                            <p style={{ color: 'red' }}>{result.message}</p>
                         ) : (
                             <>
-                                <p style={{ fontSize: '1.2em', fontWeight: 'bold", margin: '0 0 5px 0" }}>
+                                <p style={{ fontSize: '1.2em', fontWeight: 'bold', margin: '0 0 5px 0' }}>
                                     {amount} {formatCurrencyDisplay(fromCurrency)} 兌換結果:
                                 </p>
-                                <p style={{ fontSize: '1.6em', color: '#0070f3", margin: '0" }}>
-                                    約等於 <span style={{ fontWeight: 'bolder" }}>{result.amount}</span> {formatCurrencyDisplay(toCurrency)}
+                                <p style={{ fontSize: '1.6em', color: '#0070f3', margin: '0' }}>
+                                    約等於 <span style={{ fontWeight: 'bolder' }}>{result.amount}</span> {formatCurrencyDisplay(toCurrency)}
                                 </p>
                             </>
                         )}
