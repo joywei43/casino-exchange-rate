@@ -14,13 +14,13 @@ const calculateRates = (baseRates, spreadConfig) => {
     const finalRates = {};
 
     DISPLAY_PAIRS.forEach(({ from, to }) => {
-        // 匯率鍵 e.g., 'TWD_KRW'
+        // 匯率鍵 e.g., 'NTD_KRW'
         const rateKey = `${from}_${to}`;
         const spreadDelta = spreadConfig[rateKey];
 
         // --- 1. 計算 Mid Rate (中價) ---
         // 匯率公式: R(A->B) = R(USD->B) / R(USD->A)
-        // 例如：R(TWD->KRW) = R(USD->KRW) / R(USD->TWD)
+        // 例如：R(NTD->KRW) = R(USD->KRW) / R(USD->NTD)
         
         let midRate;
         
@@ -65,7 +65,7 @@ const Home = () => {
 
     // 計算機狀態
     const [amount, setAmount] = useState(100);
-    const [fromCurrency, setFromCurrency] = useState('TWD');
+    const [fromCurrency, setFromCurrency] = useState('NTD');
     const [toCurrency, setToCurrency] = useState('USD');
     const [result, setResult] = useState(null);
     const [type, setType] = useState('buy'); 
@@ -232,7 +232,7 @@ const Home = () => {
             <section style={{ marginBottom: '50px', backgroundColor: 'white', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 8px rgba(0,0,0,0.05)' }}>
                 <h2>📈 實時匯率</h2>
                 <blockquote style={{ borderLeft: '3px solid #d9534f', paddingLeft: '15px', margin: '15px 0', backgroundColor: '#f9e8e7', fontSize: '0.9em' }}>
-                    **自訂價差：** TWD/KRW: 6% | TWD/USD: 3% | TWD/PHP: 6% | USD/KRW: 5% | USD/PHP: 5%
+                    **自訂價差：** NTD/KRW: 6% | NTD/USD: 3% | NTD/PHP: 6% | USD/KRW: 5% | USD/PHP: 5%
                 </blockquote>
                 {renderRateTable()}
             </section>
