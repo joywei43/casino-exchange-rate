@@ -3,6 +3,9 @@ import Head from 'next/head';
 import { useState, useEffect, useCallback } from 'react';
 import { SPREAD_CONFIG, DISPLAY_PAIRS, CURRENCY_SYMBOLS, CURRENCIES } from '../config';
 
+// 固定的 USDT 圖標 (使用 Unicode 符號)
+const USDT_ICON = '🟡'; // 可以替換為任何其他表情符號或圖片連結
+
 // --- 匯率計算核心邏輯 ---
 
 /**
@@ -14,34 +17,24 @@ const calculateRates = (baseRates, spreadConfig) => {
     const finalRates = {};
 
     DISPLAY_PAIRS.forEach(({ from, to }) => {
-        // 匯率鍵 e.g., 'NTD_KRW'
         const rateKey = `${from}_${to}`;
         const spreadDelta = spreadConfig[rateKey];
-
-        // --- 1. 計算 Mid Rate (中價) ---
-        // 匯率公式: R(A->B) = R(USD->B) / R(USD->A)
-        // 例如：R(NTD->KRW) = R(USD->KRW) / R(USD->NTD)
         
         let midRate;
-        
         if (from === 'USD') {
-             // 如果是 USD 基準，直接取目標貨幣的 rates
             midRate = baseRates[to];
         } else {
-            // 計算交叉匯率
+            // 這個專案只有 USD 為基準，所以這裡的 else 主要是防止錯誤
             midRate = baseRates[to] / baseRates[from];
         }
         
         if (midRate === undefined || midRate === 0) {
              console.error(`Missing base rate or invalid mid rate for ${rateKey}`);
-             return; // 跳過缺少數據的交易對
+             return; 
         }
 
-        // --- 2. 計算 Buy/Sell Rate ---
-        // Buy Rate (客戶買入目標幣): 價格較高 (+Spread)
+        // 計算 Buy/Sell Rate
         const buyRate = midRate * (1 + spreadDelta); 
-        
-        // Sell Rate (客戶賣出目標幣): 價格較低 (-Spread)
         const sellRate = midRate * (1 - spreadDelta); 
 
         finalRates[rateKey] = {
@@ -52,6 +45,11 @@ const calculateRates = (baseRates, spreadConfig) => {
     });
 
     return finalRates;
+};
+
+// --- 輔助函數：將 USD 替換為 USDT 顯示 ---
+const formatCurrencyDisplay = (code) => {
+    return code === 'USD' ? `USDT ${USDT_ICON}` : code;
 };
 
 // --- 前端元件與介面 ---
@@ -65,17 +63,16 @@ const Home = () => {
 
     // 計算機狀態
     const [amount, setAmount] = useState(100);
-    const [fromCurrency, setFromCurrency] = useState('NTD');
-    const [toCurrency, setToCurrency] = useState('USD');
+    const [fromCurrency, setFromCurrency] = useState('USD'); // 預設為 USD/USDT
+    const [toCurrency, setToCurrency] = useState('KRW');
     const [result, setResult] = useState(null);
     const [type, setType] = useState('buy'); 
 
-    // --- 數據獲取函數 (使用 Exchangerate.host 代理) ---
+    // --- 數據獲取函數 (API 代理) ---
     const fetchRates = useCallback(async () => {
         setLoading(true);
         setError(null);
         try {
-            // 呼叫我們自己的後端代理路由
             const res = await fetch('/api/liveRates'); 
             const apiData = await res.json();
             
@@ -83,15 +80,14 @@ const Home = () => {
                 throw new Error(apiData.details || apiData.error);
             }
             
-            // 計算買賣價 (使用 config.js 價差)
-            // apiData.rates 是 USD 為基準的中價
             const calculatedRates = calculateRates(apiData.rates, SPREAD_CONFIG);
             
             setRates(calculatedRates);
-            setTimestamp(apiData.timestamp); // 使用 API 返回的時間戳
+            setTimestamp(apiData.timestamp);
             
         } catch (err) {
-            setError('數據獲取失敗，請稍後再試: ' + err.message);
+            // 由於 API 可能拒絕，我們顯示一個更清晰的錯誤提示
+            setError('數據獲取失敗，請檢查 API Key 或等待額度重置。');
         } finally {
             setLoading(false);
         }
@@ -100,7 +96,6 @@ const Home = () => {
     // 初始載入和每小時更新 (前端定時器)
     useEffect(() => {
         fetchRates();
-        // 每 3600 秒 (1 小時) 重新抓取一次數據
         const intervalId = setInterval(fetchRates, 3600000); 
 
         return () => clearInterval(intervalId);
@@ -115,48 +110,11 @@ const Home = () => {
         }
 
         const rateKey = `${fromCurrency}_${toCurrency}`;
-        
-        // 檢查是否為指定的交易對
         const rateObject = rates[rateKey];
 
         if (!rateObject) {
-            // 如果不是指定的五個交易對，則嘗試計算反向匯率
-            const inverseRateKey = `${toCurrency}_${fromCurrency}`;
-            const inverseRateObject = rates[inverseRateKey];
-            
-            if (inverseRateObject) {
-                // 如果找到反向匯率，使用反向公式計算買賣價
-                // R(A->B) = 1 / R(B->A)
-                // 客戶買入 B (A->B)：使用 R(B->A) 的 Buy Rate -> 1 / R(B->A)_Sell
-                // 客戶賣出 B (A->B)：使用 R(B->A) 的 Sell Rate -> 1 / R(B->A)_Buy
-                
-                let finalRate;
-                if (type === 'buy') {
-                    // 客戶買入 B (A->B) 時，您是以高價賣出 A，對應 R(B->A) 的 Sell Rate (您低價買入 B)
-                    // 這裡的邏輯比較複雜，為了簡化和確保價差邏輯正確：
-                    // 我們從中價計算
-                    const midRate = 1 / inverseRateObject.mid; 
-                    const spreadDelta = SPREAD_CONFIG[inverseRateKey] || 0.005; // 由於是反向，價差應該相同
-                    
-                    // 重新計算目標匯率的買賣價 (A->B)
-                    finalRate = type === 'buy' ? midRate * (1 + spreadDelta) : midRate * (1 - spreadDelta);
-
-                } else {
-                    // 客戶賣出 B (A->B) 時，您是以低價買入 B，對應 R(B->A) 的 Buy Rate (您高價賣出 B)
-                     const midRate = 1 / inverseRateObject.mid; 
-                     const spreadDelta = SPREAD_CONFIG[inverseRateKey] || 0.005; 
-                    
-                     finalRate = type === 'buy' ? midRate * (1 + spreadDelta) : midRate * (1 - spreadDelta);
-                }
-                 
-                // 由於交叉和反向計算邏輯複雜，這裡我們統一採用中價計算後，加上價差，確保單向性
-                // 為了避免錯誤，如果不是 DISPLAY_PAIRS 中的，我們不允許試算
-                 setResult({ message: '請選擇顯示列表中的五個主要交易對進行試算。' });
-                 return;
-            } else {
-                setResult({ message: '該交易對不在五個主要匯率中，無法試算。' });
-                return;
-            }
+             setResult({ message: '該交易對不在顯示列表中，請選擇 USD 兌換其他貨幣。' });
+             return;
         }
 
         let finalRate = type === 'buy' ? rateObject.buy : rateObject.sell;
@@ -191,12 +149,16 @@ const Home = () => {
                         
                         if (!rate) return null;
                         
-                        const displayRate = `1 ${CURRENCY_SYMBOLS[from] || from} = ${CURRENCY_SYMBOLS[to] || to}`;
+                        // 替換顯示名稱
+                        const displayFrom = formatCurrencyDisplay(from);
+                        const displayTo = formatCurrencyDisplay(to);
+
+                        const displayRate = `1 ${displayFrom} = ${CURRENCY_SYMBOLS[to] || to}`;
 
                         return (
                             <tr key={rateKey} style={{ borderBottom: '1px solid #eee' }}>
                                 <td style={{ padding: '10px', border: '1px solid #ddd', fontWeight: 'bold' }}>
-                                    {icon} {from}/{to} <span style={{fontSize:'0.8em', fontWeight: 'normal'}} >({displayRate})</span>
+                                    {USDT_ICON} {displayFrom.replace(` ${USDT_ICON}`, '')}/{to} <span style={{fontSize:'0.8em', fontWeight: 'normal'}} >({displayRate})</span>
                                 </td>
                                 <td style={{ padding: '10px', border: '1px solid #ddd', color: '#28a745' }}>
                                     {rate.buy.toFixed(4)}
@@ -232,7 +194,7 @@ const Home = () => {
             <section style={{ marginBottom: '50px', backgroundColor: 'white', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 8px rgba(0,0,0,0.05)' }}>
                 <h2>📈 實時匯率</h2>
                 <blockquote style={{ borderLeft: '3px solid #d9534f', paddingLeft: '15px', margin: '15px 0', backgroundColor: '#f9e8e7', fontSize: '0.9em' }}>
-                    **自訂價差：** NTD/KRW: 6% | NTD/USD: 3% | NTD/PHP: 6% | USD/KRW: 5% | USD/PHP: 5%
+                    **自訂價差：** USD/KRW: 5% | USD/PHP: 5% | USD/JPY: 5% | USD/HKD: 5%
                 </blockquote>
                 {renderRateTable()}
             </section>
@@ -256,14 +218,14 @@ const Home = () => {
                     <div>
                         <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>從幣種:</label>
                         <select value={fromCurrency} onChange={(e) => setFromCurrency(e.target.value)} style={{ padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}>
-                            {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+                            {CURRENCIES.map(c => <option key={c} value={c}>{formatCurrencyDisplay(c)}</option>)}
                         </select>
                     </div>
 
                     <div>
                         <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>到幣種:</label>
                         <select value={toCurrency} onChange={(e) => setToCurrency(e.target.value)} style={{ padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}>
-                            {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+                            {CURRENCIES.map(c => <option key={c} value={c}>{formatCurrencyDisplay(c)}</option>)}
                         </select>
                     </div>
                 </div>
@@ -277,7 +239,7 @@ const Home = () => {
                             onChange={() => setType('buy')} 
                             style={{ marginRight: '5px' }}
                         />
-                        客戶**買入** {toCurrency} (使用買入價)
+                        客戶**買入** {formatCurrencyDisplay(toCurrency)} (使用買入價)
                     </label>
                     <label>
                         <input 
@@ -287,7 +249,7 @@ const Home = () => {
                             onChange={() => setType('sell')} 
                             style={{ marginRight: '5px' }}
                         />
-                        客戶**賣出** {toCurrency} (使用賣出價)
+                        客戶**賣出** {formatCurrencyDisplay(toCurrency)} (使用賣出價)
                     </label>
                 </div>
 
@@ -302,13 +264,13 @@ const Home = () => {
                         ) : (
                             <>
                                 <p style={{ fontSize: '1.3em', fontWeight: 'bold', margin: '0 0 10px 0' }}>
-                                    {amount} {fromCurrency} 兌換結果:
+                                    {amount} {formatCurrencyDisplay(fromCurrency)} 兌換結果:
                                 </p>
                                 <p style={{ fontSize: '1.8em', color: '#0070f3', margin: '0' }}>
-                                    約等於 <span style={{ fontWeight: 'bolder' }}>{result.amount}</span> {toCurrency}
+                                    約等於 <span style={{ fontWeight: 'bolder' }}>{result.amount}</span> {formatCurrencyDisplay(toCurrency)}
                                 </p>
                                 <p style={{ fontSize: '0.9em', color: '#666', marginTop: '10px' }}>
-                                    (本次使用的匯率: 1 {fromCurrency} = {result.rate} {toCurrency})
+                                    (本次使用的匯率: 1 {formatCurrencyDisplay(fromCurrency)} = {result.rate} {formatCurrencyDisplay(toCurrency)})
                                 </p>
                             </>
                         )}
