@@ -10,23 +10,16 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: 'API Key 未設置，請檢查 Vercel 環境變數 FREE_CURRENCY_API_KEY。' });
     }
 
-    // --- 關鍵修正：只向 API 請求 KRW, PHP, JPY, HKD ---
+    // 關鍵修正：只請求 KRW, PHP, JPY, HKD
     const targetCurrencies = CURRENCIES.filter(c => c !== 'USD').join(','); 
-    
-    // API 請求 URL: base_currency=USD
     const url = `${BASE_URL}?apikey=${API_KEY}&base_currency=USD&currencies=${targetCurrencies}`; 
-    // ----------------------------------------------------
 
     try {
         const response = await fetch(url);
         
         if (!response.ok) {
             let errorText = await response.text();
-            
-            return res.status(response.status).json({ 
-                error: `外部 API 服務錯誤 (${response.status})`,
-                details: errorText.substring(0, 500) 
-            });
+            return res.status(response.status).json({ error: `外部 API 服務錯誤 (${response.status})`, details: errorText.substring(0, 500) });
         }
         
         const data = await response.json();
@@ -36,13 +29,11 @@ export default async function handler(req, res) {
             return res.status(500).json({ error: '外部 API 數據錯誤', details: errorDetail });
         }
         
-        // 補充 USD 基準值
         const finalRates = {
             ...data.data,
             'USD': 1.00 
         };
 
-        // 成功獲取數據，返回給前端
         res.status(200).json({
             rates: finalRates, 
             timestamp: Date.now(),
