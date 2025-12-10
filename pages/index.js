@@ -5,7 +5,7 @@ import { SPREAD_CONFIG, DISPLAY_PAIRS, CURRENCY_SYMBOLS, CURRENCIES } from '../c
 
 const USDT_IMG_URL = '/tether-usdt-logo.png'; 
 
-// --- 匯率計算核心邏輯 (確保包含反向計算) ---
+// --- 匯率計算核心邏輯 (保持不變) ---
 const calculateRates = (baseRates, spreadConfig) => {
     const finalRates = {};
 
@@ -54,9 +54,9 @@ const Home = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    const [amount, setAmount] = useState(20000000); // 預設為您的測試金額
-    const [fromCurrency, setFromCurrency] = useState('KRW'); // 預設為您的測試幣種
-    const [toCurrency, setToCurrency] = useState('USD'); 
+    const [amount, setAmount] = useState(100);
+    const [fromCurrency, setFromCurrency] = useState('USD'); 
+    const [toCurrency, setToCurrency] = useState('KRW'); 
     const [result, setResult] = useState(null);
 
     // --- 數據獲取函數 (保持不變) ---
@@ -117,26 +117,24 @@ const Home = () => {
         const inverseRateKey = `${toCurrency}_${fromCurrency}`;
 
         let finalRate;
-        let rateTypeDisplay;
+        let rateTypeDisplay; // 用於顯示是 Buy 還是 Sell 價格
         
         // 1. 檢查正向和反向交易對
         if (rates[rateKey]) {
             // 情境 1: 正向交易 (USD -> KRW)
             // 邏輯: 客戶提供 USDT，收到 KRW => 使用 Sell 價 (網站賣出 KRW)
+            
+            // 修正：依照您的邏輯 (鍵入價格 * Sell 匯率)
             finalRate = rates[rateKey].sell;
-            rateTypeDisplay = 'Sell (客戶收到)';
+            rateTypeDisplay = 'Sell (網站賣出)';
         } 
         else if (rates[inverseRateKey]) {
             // 情境 2: 反向交易 (KRW -> USD)
             // 邏輯: 客戶提供 KRW，收到 USDT => 使用 Buy 價 (網站買入 KRW)
-            // R(A->B) 的 Buy = 1 / R(B->A) 的 Sell (這是 Buy 價，用於客戶買入)
             
-            // 這裡必須修正：您希望 KRW -> USDT 使用的是 Buy 價。
-            // 匯率應為 1 / R(USD -> KRW) 的 Sell 價！
-            // 這是業務邏輯和金融邏輯的反轉。
-            
-            // R(A->B) 的 Buy = 1 / R(B->A) 的 Sell 
-            finalRate = 1 / rates[inverseRateKey].sell;
+            // 修正：依照您的邏輯 (鍵入價格 / Buy 匯率)
+            // R(A->B) = 1 / R(B->A) 的 Buy 價
+            finalRate = 1 / rates[inverseRateKey].buy;
             rateTypeDisplay = 'Buy (客戶買入)';
         } else {
             setResult({ message: '不支援該交易對。請選擇 USD/USDT 與 KRW/PHP/JPY/HKD 之間的兌換。' });
@@ -149,7 +147,7 @@ const Home = () => {
             amount: convertedAmount.toFixed(4),
             rate: finalRate.toFixed(4),
             message: null,
-            rateType: rateTypeDisplay,
+            rateType: rateTypeDisplay, // 僅用於在結果中顯示，以供確認
         });
     };
 
