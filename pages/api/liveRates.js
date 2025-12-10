@@ -1,10 +1,8 @@
 // pages/api/liveRates.js
 
-// 確保在 Vercel Settings 中設置了 FREE_CURRENCY_API_KEY
 const API_KEY = process.env.FREE_CURRENCY_API_KEY; 
 const BASE_URL = 'https://api.freecurrencyapi.com/v1/latest'; 
 
-// 從 config.js 導入 CURRENCIES 列表
 import { CURRENCIES } from '../../config';
 
 export default async function handler(req, res) {
@@ -12,10 +10,10 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: 'API Key 未設置，請檢查 Vercel 環境變數 FREE_CURRENCY_API_KEY。' });
     }
 
-    // --- 關鍵修正：Freecurrencyapi 使用 currencies 參數 ---
+    // --- 關鍵修正：只向 API 請求 KRW, PHP, JPY, HKD ---
     const targetCurrencies = CURRENCIES.filter(c => c !== 'USD').join(','); 
     
-    // 修正 URL 格式：使用 currencies 替換 symbols
+    // API 請求 URL: base_currency=USD
     const url = `${BASE_URL}?apikey=${API_KEY}&base_currency=USD&currencies=${targetCurrencies}`; 
     // ----------------------------------------------------
 
@@ -33,13 +31,12 @@ export default async function handler(req, res) {
         
         const data = await response.json();
 
-        // 檢查 API 響應內容
         if (!data.data) {
             const errorDetail = data.message || 'API 響應內容無效或缺少 rates 數據';
             return res.status(500).json({ error: '外部 API 數據錯誤', details: errorDetail });
         }
         
-        // 補充 USD 基準值 (API base_currency=USD，USD 匯率應該是 1)
+        // 補充 USD 基準值
         const finalRates = {
             ...data.data,
             'USD': 1.00 
