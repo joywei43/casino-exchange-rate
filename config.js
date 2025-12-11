@@ -5,8 +5,8 @@ export const CURRENCIES = ['USD', 'KRW', 'PHP', 'JPY', 'HKD'];
 
 // 【FINAL 價差設定】所有上下價差都改成 3%
 export const SPREAD_CONFIG = {
-  'USD_KRW': 0.03, // 3%
-  'USD_PHP': 0.03, // 3%
+  'USD_KRW': 0.035, // 3.5%
+  'USD_PHP': 0.035, // 3.5%
   'USD_JPY': 0.03, // 3%
   'USD_HKD': 0.03, // 3%
 };
